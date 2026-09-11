@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed:gerar": "tsx scripts/gerar-seed.ts",
-    "db:tipos": "supabase gen types typescript --linked > lib/dados/tipos-banco.ts"
+    "db:tipos": "supabase gen types typescript --linked > lib/dados/tipos-banco.ts",
+    "db:verificar": "tsx --env-file=.env.local scripts/verificar-banco.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

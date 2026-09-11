@@ -248,6 +248,135 @@ join pessoas pe on pe.nome = v.pessoa;
 
 fs.writeFileSync(DESTINO, sql)
 
+// ─────────────────────── ordem estável (migração 0005) ───────────────────────
+// A posição do projeto faseia a cadência no motor e a ordem dos cargos define a ordem
+// dos participantes. O banco não garante nenhuma das duas sem uma coluna explícita.
+const DESTINO_ORDEM = path.join(
+  process.cwd(),
+  "supabase/migrations/20260911000005_ordem_estavel.sql"
+)
+
+const sqlOrdem = `-- ═══════════════════════════════════════════════════════════════════
+-- Cadência · ordem estável para o motor
+-- projetos.sequencia: a posição do projeto faseia a cadência até a E14 trocar por datas
+-- playbook_item_cargos.ordem: a ordem dos cargos define a ordem dos participantes
+-- Gerado por scripts/gerar-seed.ts.
+-- ═══════════════════════════════════════════════════════════════════
+
+alter table projetos add column sequencia int;
+alter table playbook_item_cargos add column ordem int not null default 0;
+
+update projetos p set sequencia = v.seq
+from (values
+    ${linhas(mundo.projetos.map((pr) => `(${t(pr.nome)}, ${n(pr.id)})`))}
+) as v(nome, seq)
+where p.nome = v.nome;
+
+-- projetos novos entram no fim da fila
+create sequence projetos_sequencia_seq owned by projetos.sequencia;
+select setval('projetos_sequencia_seq', (select coalesce(max(sequencia), -1) + 1 from projetos), false);
+alter table projetos alter column sequencia set default nextval('projetos_sequencia_seq');
+alter table projetos alter column sequencia set not null;
+create unique index projetos_sequencia_idx on projetos (sequencia);
+
+update playbook_item_cargos pic set ordem = x.ordem
+from (
+  select i.id as item, c.id as cargo, v.ordem
+  from (values
+    ${linhas(
+      Object.entries(PLAYBOOK_PADRAO).flatMap(([fase, itens]) =>
+        itens.flatMap((item) =>
+          item.papeis.map((papel, i) => `(${t(fase)}, ${t(item.tipo)}, ${t(papel)}, ${n(i)})`)
+        )
+      )
+    )}
+  ) as v(etapa, tipo, cargo, ordem)
+  join etapas e on e.chave = v.etapa
+  join tipos_cerimonia tc on tc.nome = v.tipo
+  join playbook_itens i on i.etapa_id = e.id and i.tipo_cerimonia_id = tc.id
+  join cargos c on c.nome = v.cargo
+) x
+where pic.playbook_item_id = x.item and pic.cargo_id = x.cargo;
+
+-- carregar_mundo passa a respeitar as duas ordens
+create or replace function public.carregar_mundo() returns jsonb
+language sql stable security invoker set search_path = public as $$
+  select jsonb_build_object(
+    'cargos', (
+      select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'nome', c.nome, 'ordem', c.ordem) order by c.ordem, c.nome), '[]'::jsonb)
+      from cargos c where c.ativo
+    ),
+    'pessoas', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', p.id, 'nome', p.nome, 'iniciais', p.iniciais, 'cargo_id', p.cargo_id, 'email', p.email
+      ) order by p.criado_em, p.nome), '[]'::jsonb)
+      from pessoas p where p.ativo
+    ),
+    'times', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', t.id, 'nome', t.nome,
+        'membros', (select coalesce(jsonb_agg(m.pessoa_id), '[]'::jsonb) from time_membros m where m.time_id = t.id)
+      ) order by t.nome), '[]'::jsonb)
+      from times t where t.ativo
+    ),
+    'etapas', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', e.id, 'chave', e.chave, 'rotulo', e.rotulo, 'urgencia', e.urgencia,
+        'prazo_dias', e.prazo_dias, 'hue', e.hue, 'ordem', e.ordem
+      ) order by e.ordem), '[]'::jsonb)
+      from etapas e where e.ativo
+    ),
+    'playbook', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', i.id, 'etapa_id', i.etapa_id, 'tipo', tc.nome, 'hue', tc.hue,
+        'duracao_min', i.duracao_min, 'cadencia_semanas', i.cadencia_semanas,
+        'prioridade', i.prioridade, 'obrigatoria', i.obrigatoria,
+        'cargos', (
+          select coalesce(jsonb_agg(pic.cargo_id order by pic.ordem), '[]'::jsonb)
+          from playbook_item_cargos pic where pic.playbook_item_id = i.id
+        )
+      ) order by i.ordem), '[]'::jsonb)
+      from playbook_itens i
+      join tipos_cerimonia tc on tc.id = i.tipo_cerimonia_id
+    ),
+    'projetos', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', pr.id, 'nome', pr.nome, 'cliente_id', pr.cliente_id, 'cliente', cl.nome,
+        'prioridade', coalesce(pr.prioridade, cl.prioridade), 'etapa_id', pr.etapa_id,
+        'time_id', pr.time_id, 'mes', pr.mes, 'health', pr.health, 'atraso_dias', pr.atraso_dias,
+        'sequencia', pr.sequencia,
+        'produtos', (
+          select jsonb_build_object(
+            'relatorios', count(*) filter (where pd.tipo = 'relatorio'),
+            'dashboards', count(*) filter (where pd.tipo = 'dashboard'),
+            'integracoes', count(*) filter (where pd.tipo = 'integracao')
+          ) from produtos pd where pd.projeto_id = pr.id
+        ),
+        'squad', (
+          select coalesce(jsonb_object_agg(a.cargo_id::text, a.pessoa_id), '{}'::jsonb)
+          from alocacoes a where a.projeto_id = pr.id and a.fim is null
+        )
+      ) order by pr.sequencia), '[]'::jsonb)
+      from projetos pr
+      join clientes cl on cl.id = pr.cliente_id
+      where pr.ativo
+    ),
+    'premissas_cargo', (
+      select coalesce(jsonb_object_agg(v.cargo_id::text, to_jsonb(v) - 'id' - 'autor' - 'criado_em'), '{}'::jsonb)
+      from premissas_cargo_vigentes v
+    ),
+    'premissas_gerais', (
+      select coalesce(jsonb_object_agg(chave, valor), '{}'::jsonb) from premissas_gerais_vigentes
+    ),
+    'prioridades', (
+      select coalesce(jsonb_object_agg(nivel::text, peso), '{}'::jsonb) from prioridades_cliente
+    )
+  )
+$$;
+`
+
+fs.writeFileSync(DESTINO_ORDEM, sqlOrdem)
+
 const cadeiras = mundo.projetos.reduce(
   (s, pr) => s + Object.values(pr.squad).filter((x) => x !== undefined).length,
   0

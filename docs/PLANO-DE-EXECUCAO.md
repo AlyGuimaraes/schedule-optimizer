@@ -138,11 +138,11 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 
 | ID | Etapa | Fase (§11) | Depende de | Dias de dev | Status |
 |---|---|---|---|---|---|
-| E00 | Setup do projeto e infraestrutura | 1 Fundação | | 1 | 🟡 falta GitHub e CI |
+| E00 | Setup do projeto e infraestrutura | 1 Fundação | | 1 | 🟡 falta ligar a Vercel ao GitHub |
 | E01 | Design system Cadência | 1 Fundação | E00 | 5 | ⬜ |
 | E02 | Motor de domínio em TypeScript | 1 Fundação | E00 | 5 | 🟡 porte e paridade prontos |
 | E03 | Banco de dados, autenticação e RLS | 1 Fundação | E02 (tipos) | 4 | 🟡 esquema, RLS e seed no ar |
-| E04 | Camada de dados e estado da aplicação | 1 Fundação | E02, E03 | 3 | ⬜ |
+| E04 | Camada de dados e estado da aplicação | 1 Fundação | E02, E03 | 3 | 🟡 mundo do banco no motor |
 | E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | ⬜ |
 | E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ⬜ |
 | E07 | Tela Premissas (Gerais, Por cargo, Urgência, Playbook) | 1 Fundação | E01, E04 | 5 | ⬜ |
@@ -214,8 +214,8 @@ flowchart LR
 - [x] Vercel: projeto criado, `vercel link`, variáveis públicas nos três ambientes, `vercel.json` com região gru1
 - [x] `CLAUDE.md` com fontes de verdade e convenções
 - [x] Repositório GitHub privado `AlyGuimaraes/schedule-optimizer` e push por SSH
-- [ ] `vercel git connect` para deploy automático por push e preview por PR
-- [ ] GitHub Actions: lint, typecheck, testes e build em todo PR
+- [ ] `vercel git connect` para deploy automático por push e preview por PR. Depende de instalar o app da Vercel no GitHub com acesso ao repositório (ação no navegador)
+- [x] GitHub Actions: lint, typecheck, testes e build em todo push na `main` e em todo PR (`.github/workflows/ci.yml`, primeira execução verde em 49s)
 - [ ] Proteção da branch `main`, template de PR, Conventional Commits
 - [ ] `site_url` e redirects do Supabase Auth apontando para o domínio da Vercel
 
@@ -306,7 +306,7 @@ flowchart LR
 - [x] Os números da seção 1.3 como asserts explícitos
 - [x] Atenção: `agendarBaseline` embaralha com `sort(() => rnd() - 0.5)` (L1151), que depende do algoritmo de ordenação do V8. Mantido igual para travar a paridade; a troca por Fisher-Yates entra num commit separado, com o golden regravado
 - [ ] Depois da paridade travada, corrigir os defeitos de domínio da seção 6, um commit e um teste por defeito
-- [ ] `workers/motor.worker.ts`: mensagem `{ mundo, config }` devolve `Simulacao`; cancelamento da execução anterior quando chega uma nova
+- [x] `workers/motor.worker.ts`: mensagem `{ mundo, config }` devolve `Simulacao`; respostas de execuções antigas são descartadas pelo estado (`lib/estado/cadencia.ts`)
 - [x] Validador independente `validarPlano()` que confere as restrições rígidas R1 a R13 do §4.1 sobre qualquer resultado, usado pelo guloso e pelo CP-SAT; a checagem da regra de time (§2.0) é opcional por causa do defeito 15
 - [x] Benchmark: 112 projetos, 20 pessoas, horizonte de 4 semanas em 49ms e de 8 semanas abaixo de 1s, com teste de regressão
 
@@ -360,7 +360,8 @@ flowchart LR
 - [x] RPCs transacionais: `remover_etapa(id, destino)`, `excluir_time(id, destino)`, `salvar_squads(jsonb)`, `carregar_mundo()` (devolve o mundo vigente num jsonb só)
 - [x] Seed gerado por `scripts/gerar-seed.ts` (`pnpm seed:gerar`) a partir de `lib/dominio/semente.ts` com semente 7: 6 cargos, 20 pessoas, 4 times, 6 etapas, 13 itens de playbook, 95 clientes, 112 projetos, 940 produtos e 266 cadeiras
 - [x] O seed passa `montarSquad` em todos os projetos antes de gravar, o que corrige o defeito 15
-- [ ] Regravar os números de referência da seção 1.3 e o golden da paridade sobre a base com a regra do time aplicada
+- [x] Números de referência da base com a regra do time fixados em `tests/unit/mapeador.test.ts` (52 alocadas, 6 adiadas, cobertura 89,7%, obrigatórias 94,2%, SLA 100%, 0,61 FTE) e conferidos contra o banco real com `pnpm db:verificar`; a paridade com o protótipo continua travada sobre a semente original
+- [x] Migração `20260911000005_ordem_estavel.sql`: `projetos.sequencia` e `playbook_item_cargos.ordem`, porque a posição do projeto faseia a cadência e a ordem dos cargos define a ordem dos participantes
 - [ ] Auth com conta Microsoft (provedor Azure do Supabase, app registration no Entra ID), restrito ao tenant LeverPro; página `/entrar`; `proxy.ts` do Next 16 renovando a sessão com `@supabase/ssr` e protegendo o grupo `(app)`. Como a agenda está no Outlook (D-10), o mesmo tenant serve ao login e ao Graph (D-13)
 - [x] RLS em todas as tabelas: leitura para autenticados, escrita para gestor e admin via `tem_papel()`, playbook e cargos só para admin, auditoria somente leitura, `agente_execucoes` e `solver_jobs` sem política (só service role)
 - [x] Perfil de usuário criado automaticamente no primeiro acesso, por trigger em `auth.users`
@@ -369,18 +370,21 @@ flowchart LR
 
 **Critérios de aceite.** `supabase db push` limpo; o seed reproduz os números da seção 1.3 quando carregado no motor; RLS testada; login com Google funcionando em preview.
 
-#### E04 · Camada de dados e estado da aplicação · ⬜
+#### E04 · Camada de dados e estado da aplicação · 🟡
 
 **Objetivo.** Ligar banco, motor e interface: carregar o mundo vigente, recalcular a cada edição e persistir com segurança.
 **Requisitos.** R13, R20, R21, R51.
 
-- [ ] `lib/dados/`: clientes Supabase de servidor e navegador, repositórios por agregado, mapeadores banco ↔ domínio (minutos ↔ slots; uuid ↔ índice interno do motor, que usa arrays por pessoa)
-- [ ] Carregamento do mundo num Server Component via `carregar_mundo()`, com cache por tag e `revalidateTag` nas mutações (conferir a API de cache do Next 16 em `node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md`)
-- [ ] Store (Zustand) com mundo, config, cenário atual × otimizado, resultado da simulação e estado de interface
+- [x] `lib/dados/mapeador.ts`: banco → domínio (minutos → slots; uuid → índice interno do motor, com `Indices` guardando o caminho de volta), testado com ordem embaralhada de squads, membros, cargos e projetos
+- [x] `lib/dados/admin.ts` e `lib/dados/mundo.ts`: leitura no servidor com a service role, **temporária até o login da E03**; a chave está na Vercel como variável secreta de produção e preview
+- [ ] Cliente Supabase da sessão (servidor e navegador, `@supabase/ssr`) e repositórios por agregado para as mutações; entra junto com o login da E03 e a primeira tela com edição (E05)
+- [x] Carregamento do mundo no layout do grupo `(app)` via `carregar_mundo()`, deduplicado por requisição com `cache` do React (151ms para carregar, 16ms para simular). O projeto não habilita Cache Components; a revalidação por tag entra com as mutações
+- [x] Store (Zustand) em `lib/estado/cadencia.ts` com mundo, config, índices, cenário atual × otimizado, simulação, tempo do solver e linha de estado
 - [ ] Filtros e abas na URL com `nuqs` (`?aba=`, `?escala=`, `?pessoas=`, `?clientes=`) para links compartilháveis
 - [ ] Ciclo de edição: atualização otimista → worker recalcula (debounce de 300ms nas células, como o `recalculoAdiado` do protótipo) → linha de estado "recalculando" e depois "solver N ms" → server action persiste → em erro, desfaz e mostra a mensagem no rodapé do modal (§14.8)
-- [ ] Rodapé do rail e linha de estado com números reais: perfil, cerimônias por semana, projetos e pessoas
-- [ ] Botão Otimizar: vai para o Otimizador, esqueleto no terminal por no mínimo 620ms, recalcula, anima o terminal
+- [x] Rodapé do rail e linha de estado com números reais: perfil, cerimônias por semana, projetos e pessoas
+- [x] Botão Otimizar: vai para o Otimizador, pausa mínima de 620ms, recalcula e avisa "plano recalculado, solver N ms"; o esqueleto e a animação do terminal entram com a tela, na E12
+- [x] `pnpm db:verificar`: verificação de ponta a ponta contra o banco real, com `validarPlano` e a regra do time ligada
 - [ ] Concorrência: `atualizado_em` otimista; conflito vira toast e recarga
 
 **Critérios de aceite.** Editar uma premissa reflete nos números em menos de 500ms; recarregar a página preserva tudo; uma segunda sessão vê a mudança depois da revalidação.

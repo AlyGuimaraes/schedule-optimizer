@@ -14,6 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useCadencia } from "@/lib/estado/cadencia"
 import { GRUPOS, TELAS } from "@/lib/navegacao"
 
 // Rail do protótipo sobre a anatomia oficial: 16rem expandida, 3rem recolhida,
@@ -84,14 +85,40 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="overflow-hidden rounded-md bg-sidebar-accent px-3 py-2.5 font-mono text-[10.5px] leading-[1.6] whitespace-nowrap text-muted-foreground group-data-[collapsible=icon]:hidden">
-          perfil equilibrio
-          <br />
-          horizonte de 4 semanas
-          <br />
-          motor na etapa E02
-        </div>
+        <RodapeRail />
       </SidebarFooter>
     </Sidebar>
+  )
+}
+
+// SidebarFooter do protótipo: perfil, cerimônias da semana e tamanho da operação.
+function RodapeRail() {
+  const perfil = useCadencia((s) => s.config?.perfil)
+  const demanda = useCadencia((s) => s.simulacao?.semanas[0]?.demanda.length)
+  const projetos = useCadencia((s) => s.mundo?.projetos.length)
+  const pessoas = useCadencia((s) => s.mundo?.pessoas.length)
+  const erro = useCadencia((s) => s.erro)
+  const pronto = demanda !== undefined
+
+  return (
+    <div className="overflow-hidden rounded-md bg-sidebar-accent px-3 py-2.5 font-mono text-[10.5px] leading-[1.6] whitespace-nowrap text-muted-foreground tabular group-data-[collapsible=icon]:hidden">
+      {pronto ? (
+        <>
+          perfil {perfil}
+          <br />
+          {demanda} cerimônias/sem
+          <br />
+          {projetos} projetos · {pessoas} pessoas
+        </>
+      ) : (
+        <>
+          {erro ? "sem conexão com o banco" : "carregando o mundo"}
+          <br />
+          &nbsp;
+          <br />
+          &nbsp;
+        </>
+      )}
+    </div>
   )
 }

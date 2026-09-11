@@ -1,14 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { MoonIcon, PlayIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 
-import { useCenario, type Cenario } from "@/components/cadencia/cenario-provider"
 import { Segmentado } from "@/components/cadencia/segmentado"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { useCadencia, type Cenario } from "@/lib/estado/cadencia"
 import { telaDoCaminho } from "@/lib/navegacao"
 
 const CENARIOS: { valor: Cenario; rotulo: string }[] = [
@@ -21,8 +21,14 @@ const assinarNada = () => () => {}
 // Site header de 64px do protótipo: gatilho do menu, separador, título e subtítulo da tela,
 // linha de estado do solver, cenário, tema e o botão Otimizar.
 export function SiteHeader() {
-  const tela = telaDoCaminho(usePathname())
-  const { cenario, setCenario, estado, avisar } = useCenario()
+  const pathname = usePathname()
+  const router = useRouter()
+  const tela = telaDoCaminho(pathname)
+  const cenario = useCadencia((s) => s.cenario)
+  const setCenario = useCadencia((s) => s.setCenario)
+  const estado = useCadencia((s) => s.estado)
+  const otimizar = useCadencia((s) => s.otimizar)
+  const pronto = useCadencia((s) => s.simulacao !== null)
   const { state } = useSidebar()
   const { resolvedTheme, setTheme } = useTheme()
   const montado = React.useSyncExternalStore(
@@ -72,9 +78,11 @@ export function SiteHeader() {
         </Button>
         <Button
           className="px-3.5 text-[12.5px] shadow-xs"
-          onClick={() =>
-            avisar("o motor de otimização chega na etapa E02, a tela na E12")
-          }
+          disabled={!pronto}
+          onClick={() => {
+            if (pathname !== "/otimizador") router.push("/otimizador")
+            void otimizar()
+          }}
         >
           <PlayIcon data-icon="inline-start" className="size-3.5" />
           Otimizar
