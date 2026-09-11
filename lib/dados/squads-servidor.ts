@@ -22,11 +22,12 @@ export async function remontarSquads(
 ): Promise<number> {
   const { data, error } = await sb.rpc("carregar_mundo")
   if (error) throw new Error(error.message)
-  const { mundo, indices } = mapearMundo(data as unknown as MundoBanco)
+  // a configuração traz os modificadores automáticos, que acrescentam cargos a alguns squads
+  const { mundo, indices, config } = mapearMundo(data as unknown as MundoBanco)
 
   const antes = mundo.projetos.map((p) => ({ ...p.squad }))
-  if (opcoes.rebalancear) rebalancearAlocacao(mundo)
-  else mundo.projetos.forEach((pr) => montarSquad(mundo, pr))
+  if (opcoes.rebalancear) rebalancearAlocacao(mundo, config)
+  else mundo.projetos.forEach((pr) => montarSquad(mundo, pr, config))
 
   const cadeiras: Cadeira[] = []
   mundo.projetos.forEach((pr, i) => {

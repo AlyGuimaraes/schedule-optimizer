@@ -72,7 +72,7 @@ export function otimizar(
 ): ResultadoOtimizacao {
   const n = pessoas.length
   const oc = novaOcupacao(n)
-  const PP = pessoas.map((p) => premDe(cfg, p.papel))
+  const PP = pessoas.map((p) => premDe(cfg, p.papel, cfg.excecoesPessoa?.[p.id]))
   const PF = PERFIS[cfg.perfil] || PERFIS.equilibrio
   const G = geralDe(cfg)
   const pref = new Set(G.preferidos)

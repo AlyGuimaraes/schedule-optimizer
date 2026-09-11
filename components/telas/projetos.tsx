@@ -45,6 +45,7 @@ interface Rascunho {
   rel: number
   dash: number
   integ: number
+  atraso: number
   /** escolha manual por cargo; ausente significa automático */
   squad: Record<string, number | undefined>
 }
@@ -114,6 +115,7 @@ function Projetos(ctx: Contexto) {
     rel: 3,
     dash: 2,
     integ: 1,
+    atraso: 0,
     squad: {},
   })
   const deProjeto = (idx: number): Rascunho => {
@@ -129,6 +131,7 @@ function Projetos(ctx: Contexto) {
       rel: p.produtos.relatorios,
       dash: p.produtos.dashboards,
       integ: p.produtos.integracoes,
+      atraso: p.atrasoDias ?? 0,
       squad: { ...p.squad },
     }
   }
@@ -378,6 +381,7 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
           health: d.health,
           prioridade: d.prioridade,
           produtos: { relatorios: d.rel, dashboards: d.dash, integracoes: d.integ },
+          atrasoDias: d.atraso,
           squad,
         }),
       "projeto salvo, cenário replanejado",
@@ -443,7 +447,7 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
           </select>
           <span className="dica">O squad sai dos membros deste time. Trocar o time refaz as cadeiras.</span>
         </div>
-        <div className="campo l2">
+        <div className="campo">
           <label htmlFor="epPrioridade">Prioridade do cliente</label>
           <select id="epPrioridade" value={d.prioridade} onChange={(e) => atualizar({ prioridade: e.target.value as Prioridade })}>
             {(["alta", "media", "baixa"] as const).map((h) => (
@@ -453,6 +457,18 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
             ))}
           </select>
           <span className="dica">Urgência da etapa vezes peso do cliente define a posição na fila do otimizador.</span>
+        </div>
+        <div className="campo">
+          <label htmlFor="epAtraso">Atraso em dias</label>
+          <input
+            id="epAtraso"
+            type="number"
+            min={0}
+            max={365}
+            value={d.atraso}
+            onChange={(e) => atualizar({ atraso: num(e.target.value, 0, 365) })}
+          />
+          <span className="dica">Acima de 10, com os modificadores ligados, dobra a cadência do status report.</span>
         </div>
         <div className="l4">
           <SecCab

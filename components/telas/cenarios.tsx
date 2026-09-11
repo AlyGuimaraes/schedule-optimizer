@@ -111,6 +111,12 @@ const METRICAS: Metrica[] = [
     texto: (r) => (r.estabilidade === null ? "sem vigente" : pc(r.estabilidade)),
     melhor: "maior",
   },
+  {
+    rotulo: "Violações de regra rígida",
+    valor: (r) => r.violacoes ?? 0,
+    texto: (r) => String(r.violacoes ?? 0),
+    melhor: "menor",
+  },
   { rotulo: "Tempo do solver", valor: (r) => r.solverMs, texto: (r) => `${r.solverMs} ms`, melhor: null },
 ]
 

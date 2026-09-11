@@ -167,9 +167,9 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
           <div className="campo">
             <label htmlFor="selHoriz">Horizonte de planejamento</label>
             <select id="selHoriz" value={config.horizonte} onChange={(e) => setHorizonte(Number(e.target.value))}>
-              {[2, 4, 6, 8].map((h) => (
+              {[2, 4, 6, 8, 13].map((h) => (
                 <option key={h} value={h}>
-                  {h} semanas
+                  {h === 13 ? "13 semanas, o trimestre" : `${h} semanas`}
                 </option>
               ))}
             </select>

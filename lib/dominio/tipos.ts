@@ -68,6 +68,8 @@ export interface ItemPlaybook {
   papeis: Papel[]
   obrig: boolean
   prio: number
+  /** quando o item vem de um modificador automático (§3.3), qual */
+  origem?: string
 }
 
 export interface Perfil {
@@ -106,6 +108,8 @@ export interface Projeto {
   produtos: Produtos
   mes: number
   timeId: number
+  /** desvio de cronograma em dias; acima de 10 dobra a cadência de status report (§3.3) */
+  atrasoDias?: number
 }
 
 export interface Time {
@@ -143,6 +147,10 @@ export interface Config {
   pesoEstabilidade?: number
   /** Cerimônias ancoradas pelo cliente (§12), por `chaveSerie`: restrição rígida, alocadas primeiro. */
   ancoras?: Record<string, { dia: number; slot: number }>
+  /** Liga os modificadores automáticos do playbook (§3.3). */
+  modificadores?: boolean
+  /** Exceções por pessoa (§2.1), pelo índice da pessoa: o nível mais específico vence o cargo. */
+  excecoesPessoa?: Record<number, Partial<PremissasCargoEntrada>>
 }
 
 export interface TrocaCadeira {
@@ -182,6 +190,8 @@ export interface Cerimonia {
   ancorada?: boolean
   /** saiu do lugar que tinha no plano vigente */
   movida?: boolean
+  /** modificador automático que gerou ou alterou a cerimônia */
+  origem?: string
 }
 
 export interface Concessao {

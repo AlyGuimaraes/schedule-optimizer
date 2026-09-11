@@ -1,7 +1,7 @@
 import { almoco, diaBloqueado } from "./disponibilidade"
 import { DIAS, PERFIS } from "./padroes"
 import { geralDe, premDe } from "./premissas"
-import type { Cerimonia, Config, Mundo, Papel, Pessoa, ResultadoOtimizacao } from "./tipos"
+import type { Cerimonia, Config, Mundo, Pessoa, ResultadoOtimizacao } from "./tipos"
 
 export interface Violacao {
   regra: string
@@ -32,7 +32,8 @@ export function validarPlano(
   const v: Violacao[] = []
   const G = geralDe(cfg)
   const PF = PERFIS[cfg.perfil] || PERFIS.equilibrio
-  const prem = (papel: Papel) => premDe(cfg, papel)
+  // premissas da pessoa: as do cargo com as exceções dela (§2.1)
+  const prem = (id: number) => premDe(cfg, pessoas[id].papel, cfg.excecoesPessoa?.[id])
   const nome = (id: number) => pessoas[id]?.nome ?? `pessoa ${id}`
   const acum = resultado.acum ?? new Array<number>(pessoas.length).fill(0)
   const semanaIdx = cfg.semanaIdx || 1
@@ -65,7 +66,7 @@ export function validarPlano(
     const relaxada = !!ev.relaxado
 
     ev.participantes.forEach((p) => {
-      const c = prem(pessoas[p].papel)
+      const c = prem(p)
 
       // R4: janela de trabalho e almoço
       if (s < G.inicio || s + ev.slots > G.fim)
@@ -118,7 +119,7 @@ export function validarPlano(
   // R8 e R9: limites diários por cargo
   porPessoaDia.forEach((dia, chave) => {
     const p = Number(chave.split("|")[0])
-    const c = prem(pessoas[p].papel)
+    const c = prem(p)
     const temRelaxada = resultado.alocadas.some(
       (ev) => ev.relaxado && ev.participantes.includes(p) && ev.dia === Number(chave.split("|")[1])
     )
@@ -132,7 +133,7 @@ export function validarPlano(
 
   // R10 e R11: teto semanal efetivo e orçamento mensal pró-rata
   pessoas.forEach((p) => {
-    const c = prem(p.papel)
+    const c = prem(p.id)
     const temRelaxada = resultado.alocadas.some((ev) => ev.relaxado && ev.participantes.includes(p.id))
     const teto = temRelaxada ? c.teto + (c.tetoMax - c.teto) * PF.usaTolerancia : c.teto
     if (horasSemana[p.id] > teto + 1e-9)

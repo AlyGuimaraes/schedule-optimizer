@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
-import { justificativa, simular, type PerfilId } from "@/lib/dominio"
+import { justificativa, simular, validarPlano, type PerfilId } from "@/lib/dominio"
 
 import { clienteAdmin } from "./admin"
 import { aplicarPlano, mapearMundo, type MundoBanco, type PlanoBanco } from "./mapeador"
@@ -174,6 +174,11 @@ export async function salvarCenario(e: {
       estabilidade: estab.length ? r2(estab.reduce((s, x) => s + x, 0) / estab.length) : null,
       solverMs,
       ocorrencias: ocorrencias.length,
+      // o validador independente roda em toda execução salva (critério 3 do MVP)
+      violacoes: sim.semanas.reduce(
+        (s, w) => s + validarPlano(w.otm, w.demanda, mundo.pessoas, { ...config, semanaIdx: w.semana }, mundo).length,
+        0
+      ),
     }
 
     const premissas = {

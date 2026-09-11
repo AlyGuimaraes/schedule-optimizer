@@ -6,8 +6,9 @@ import { Fragment, useState } from "react"
 import { ComDados, type Contexto } from "@/components/cadencia/com-dados"
 import { GraficoBarras } from "@/components/cadencia/grafico-barras"
 import { Confirmacao, EditorCab, EditorPe, Modal } from "@/components/cadencia/modal"
-import { Abas, IconeMais, Painel, SecCab, Selo, SeloFase, Trilha, type Tom } from "@/components/cadencia/primitivas"
+import { Abas, Chave, IconeMais, Painel, SecCab, Selo, SeloFase, Trilha, type Tom } from "@/components/cadencia/primitivas"
 import {
+  definirModificadores,
   definirPesoCliente,
   definirPremissaCargo,
   definirPremissasGerais,
@@ -24,6 +25,7 @@ import {
 import {
   etapaDe,
   geralDe,
+  medianaProdutos,
   membrosDoTime,
   pesoCliente,
   premDe,
@@ -161,6 +163,8 @@ function AbaGerais({ ctx }: { ctx: Contexto }) {
   const editarConfig = useCadencia((s) => s.editarConfig)
   const aoErro = useErroGravacao()
   const restauracao = useAcao()
+  const modificacao = useAcao()
+  const modificadores = !!ctx.config.modificadores
 
   const definir = (parcial: Partial<PremissasGerais>, adiado = false) => {
     editarConfig((c) => ({ ...c, geral: { ...geralDe(c), ...parcial } }), {
@@ -315,6 +319,39 @@ function AbaGerais({ ctx }: { ctx: Contexto }) {
           Jornada útil de <b>{n1((G.fim - G.inicio - G.almocoDur) / 2)}h</b> por dia, descontado o almoço.
         </p>
         {restauracao.erro ? <p className="nota" style={{ color: "var(--bad)" }}>{restauracao.erro}</p> : null}
+
+        <SecCab
+          titulo="Modificadores automáticos do playbook"
+          apoio={
+            <Chave
+              ligada={modificadores}
+              onChange={(v) =>
+                modificacao.executar(
+                  () => definirModificadores(v),
+                  v ? "modificadores ligados, squads remontados" : "modificadores desligados, squads remontados"
+                )
+              }
+            >
+              {modificacao.pendente ? "aplicando" : modificadores ? "ligados" : "desligados"}
+            </Chave>
+          }
+          style={{ marginTop: 26 }}
+        />
+        <ul className="nota" style={{ display: "grid", gap: 5, paddingLeft: 18, listStyle: "disc" }}>
+          <li>
+            <b>Volume de produtos:</b> mais uma sessão de validação a cada 3 produtos acima da mediana, hoje de{" "}
+            {n1(medianaProdutos(ctx.mundo))} produtos por projeto.
+          </li>
+          <li><b>Health amarelo:</b> o status report passa a ser semanal.</li>
+          <li><b>Health vermelho:</b> sala de guerra semanal, escalada ao Líder Técnico.</li>
+          <li><b>Cliente de prioridade alta:</b> checkpoint executivo mensal, em todas as fases.</li>
+          <li><b>Atraso acima de 10 dias:</b> dobra a cadência do status report até a recuperação.</li>
+        </ul>
+        <p className="nota" style={{ marginTop: 8 }}>
+          Ligar ou desligar remonta os squads, porque a sala de guerra e o checkpoint pedem cadeiras de Líder Técnico e
+          de Gerente de Projeto. As cerimônias geradas aparecem na Agenda com a origem no detalhe.
+        </p>
+        {modificacao.erro ? <p className="nota" style={{ color: "var(--bad)" }}>{modificacao.erro}</p> : null}
       </section>
     </div>
   )

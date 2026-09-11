@@ -157,9 +157,9 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | 🟡 custo por cargo pendente |
 | E09 | Importação da agenda atual | 1 Fundação | E03, E04 | 6 | ⬜ |
 | E10 | Tela Cockpit | 2 Otimizador | E01, E04 | 3 | ✅ |
-| E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | 🟡 detalhe da cerimônia na E13 |
-| E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | 🟡 execução persistida na E13 |
-| E13 | Cenários, publicação e estabilidade | 2 Otimizador | E12 | 5 | ⬜ |
+| E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | 🟡 seleção inicial depende do login |
+| E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | 🟡 validador na execução salva |
+| E13 | Cenários, publicação e estabilidade | 2 Otimizador | E12 | 5 | 🟡 falta 48h, corte de 20% e seletor global |
 | E14 | Premissas avançadas e modificadores automáticos | 2 Otimizador | E07, E12 | 4 | ⬜ |
 | E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | ⬜ |
 | E16 | Escrita nos calendários e reconciliação | 2 Otimizador | E09, E13 | 8 | ⬜ |
@@ -530,7 +530,7 @@ flowchart LR
 - [x] Seletor de semana do horizonte (melhoria: o protótipo mostra só a S1, defeito 9)
 - [x] **Mês**: uma linha por semana do horizonte com contagem e horas; células de 138px com até 6 cerimônias e "e mais N"; célula vazia tracejada; nota com o horizonte
 - [x] Painel lateral em três modos: **agregado** (cerimônias, horas, pessoa-hora, pessoas e projetos envolvidos, com concessão, acima do teto; carga por pessoa com trilha; por tipo com tags), **projeto** (prioridade e peso, urgência, prazo, mês, produtos, horas por semana e mês, cerimônias no mês, health; squad com cadeira vaga) e **pessoa** (cargo, capacidade, alvo, teto, limite, horas, folga, máximos, duração, blocos de foco, fragmentação, reuniões e horas no mês; projetos clicáveis que filtram)
-- [ ] Clique numa cerimônia abre o detalhe com participantes e justificativa (a partir da E13)
+- [x] Clique numa cerimônia abre o detalhe com participantes e justificativa (a partir da E13)
 
 **Critérios de aceite.** Seleções combinam por interseção; nada marcado significa tudo; blocos simultâneos nunca se sobrepõem; rolagem fluida com o time inteiro.
 
@@ -544,25 +544,26 @@ flowchart LR
 - [x] **Execução em três camadas**: terminal com as 9 linhas do protótipo (comando, planejador, premissas, camadas 1, 2 e 3, residual, KPI, plano pronto) e apoio "solver N ms, P projetos, Q pessoas"
 - [x] **Leitura do agente**: texto determinístico do protótipo até a E20 trocar pelo Narrador
 - [x] Abas **Resultado** (desejado × possível por cargo em 13 colunas e comparação de 8 indicadores atual × otimizado com Δ colorido), **Concessões**, **Trocas de cadeira** (todas as substituições, não só a primeira, defeito 4) e **Não atendida**, cada uma com estado vazio próprio
-- [ ] Server action `executarOtimizacao(cenarioId)`: carrega o mundo, roda o motor em Node, grava ocorrências, participantes, concessões, trocas, não atendidas e `kpis_snapshot`, e marca o cenário como simulado
-- [ ] Validador `validarPlano` rodando em toda execução; teste com 100 sementes aleatórias
+- [x] Execução persistida: `salvarCenario` (lib/dados/cenarios.ts) roda o motor no servidor e grava ocorrências com dia, slot, horário real, camada e justificativa, mais participantes, concessões, trocas, não atendidas e KPIs. Texto original: server action `executarOtimizacao(cenarioId)`: carrega o mundo, roda o motor em Node, grava ocorrências, participantes, concessões, trocas, não atendidas e `kpis_snapshot`, e marca o cenário como simulado
+- [x] Validador `validarPlano` rodando em toda execução salva (`resumo.violacoes`, exibido na comparação de cenários) e teste com 100 sementes (`tests/unit/validador.test.ts`)
 - [x] Teste por pessoa de 3 ou mais blocos de foco por semana na duração do cargo (hoje a média é 10,1)
 - [x] **SLA de etapa**: hoje 88,9% na semente 7 (o Levantamento de Requisitos de um kickoff estoura o orçamento mensal pró-rata da S1). Resolver conforme a decisão D-07 antes do marco MVP
 
 **Critérios de aceite.** Tela idêntica ao protótipo; nenhuma violação rígida em 100 sementes; execução gravada e recarregável.
 
-#### E13 · Cenários, publicação e estabilidade · ⬜
+#### E13 · Cenários, publicação e estabilidade · 🟡
 
 **Objetivo.** Implementar o fluxo de simulação de cenário (§10) e as premissas de estabilidade e antecedência (§2.2).
 **Requisitos.** R24, §2.2, §10, §12.
 
-- [ ] Cenário vigente e rascunhos: duplicar o vigente com snapshot das premissas, alterar, executar, comparar lado a lado (indicadores e diff de ocorrências), aplicar, descartar ou manter como alternativo
+- [x] Cenário vigente e rascunhos: duplicar o vigente com snapshot das premissas, alterar, executar, comparar lado a lado (indicadores e diff de ocorrências), aplicar, descartar ou manter como alternativo
 - [ ] O alternador global passa a comparar a agenda atual com o cenário ativo, com seletor de cenário
-- [ ] Estabilidade: termo w6 no custo do solver e limite de 20% de ocorrências movidas por ciclo, relaxável com registro; indicador Estabilidade do plano (1 − movidas / total)
-- [ ] Âncoras: ocorrência confirmada ou imposta pelo cliente vira restrição rígida; ação de ancorar na Agenda
+- [x] Estabilidade: termo w6 no custo do solver (`pesoEstabilidade`, 3 por padrão) e indicador Estabilidade do plano (1 − movidas / total), gravado no resumo do cenário
+- [ ] Limite de 20% de ocorrências movidas por ciclo como restrição relaxável com registro (hoje o peso w6 segura acima de 80% nos testes, mas não há corte explícito)
+- [x] Âncoras: ocorrência confirmada ou imposta pelo cliente vira restrição rígida; ação de ancorar na Agenda
 - [ ] Antecedência de 48h: nenhuma alocação nova ou movida a menos de 48h do início
-- [ ] Diff de publicação por pessoa (novas, movidas, canceladas); o gestor revisa e publica
-- [ ] Justificativa de cada ocorrência: camada, restrições ativas e por que aquele horário (mitigação da rejeição do time, §12)
+- [x] Diff de publicação por pessoa (novas, movidas, canceladas); o gestor revisa e publica
+- [x] Justificativa de cada ocorrência: camada, restrições ativas e por que aquele horário (mitigação da rejeição do time, §12)
 
 **Critérios de aceite.** Publicar gera um plano vigente imutável; replanejar mantém pelo menos 80% das ocorrências.
 
@@ -571,12 +572,14 @@ flowchart LR
 **Objetivo.** Completar os escopos de premissa (§2.1) e os modificadores do playbook (§3.3), e trocar a semana abstrata por datas reais.
 **Requisitos.** §2.1, §3.3, §12.
 
-- [ ] Exceções por pessoa e por projeto (`premissas_override`) com vigência e autor; precedência Gerais → Cargo → Pessoa → Projeto, o mais específico vence
-- [ ] Janela protegida definida pela própria pessoa no perfil (§12)
-- [ ] Modificadores determinísticos na geração da demanda, cada um visível com a origem: volume de produtos (mais uma validação a cada 3 produtos acima da mediana), health amarelo (mais um status report por semana), health vermelho (sala de guerra semanal escalada ao Líder Técnico), cliente de prioridade alta (checkpoint executivo mensal em todas as fases), atraso acima de 10 dias (dobra a cadência de status report)
+- [x] Exceções por pessoa (`premissas_override`, escopo pessoa) com vigência: janela protegida, bloco mínimo de foco, máximo de horas e de reuniões por dia, editáveis no modal da pessoa; precedência Gerais → Cargo → Pessoa, o mais específico vence (`premDe`), respeitada pelo motor, pelos indicadores e pelo validador
+- [ ] Exceções por projeto (escopo projeto): o esquema já aceita; falta definir quais campos fazem sentido por projeto
+- [x] Janela protegida da pessoa (§12): editável no modal; a edição pela própria pessoa, no perfil, depende do login (D-13)
+- [x] Modificadores determinísticos na geração da demanda, cada um visível com a origem (selo no detalhe da Agenda): volume de produtos (mais uma validação a cada 3 produtos acima da mediana), health amarelo (status report semanal), health vermelho (sala de guerra semanal escalada ao Líder Técnico), cliente de prioridade alta (checkpoint executivo mensal em todas as fases), atraso acima de 10 dias (dobra a cadência de status report). Chave em Premissas › Gerais, desligada por padrão para manter os números de referência; ligar remonta os squads
 - [ ] Ausências e feriados nacionais e municipais reduzindo a capacidade por dia; cadastro manual até a E23
 - [ ] Cadência ancorada em `series.inicio` com datas reais, substituindo `(projeto.id + semana) % cada` (defeito 8)
-- [ ] Horizonte do trimestre (13 semanas) para o critério 2 do §13
+- [x] Horizonte do trimestre (13 semanas) no Otimizador, para o critério 2 do §13
+- [x] Campo "Atraso em dias" no modal do projeto (`projetos.atraso_dias`)
 
 **Critérios de aceite.** Cada modificador com teste; exceção visível no modal da pessoa e do projeto; demanda do trimestre gerada para 112 projetos.
 

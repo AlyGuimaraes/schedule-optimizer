@@ -3,6 +3,7 @@ import type {
   Config,
   Papel,
   PremissasCargo,
+  PremissasCargoEntrada,
   PremissasGerais,
   UrgenciaEtapa,
 } from "./tipos"
@@ -15,8 +16,14 @@ import type {
  *   limite aceitável   = min(Cl × (1 − alvo + tolerância), máximo absoluto)
  * A tolerância negocia o percentual, nunca o número absoluto declarado.
  */
-export function premDe(cfg: Partial<Config> | undefined, papel: Papel): PremissasCargo {
-  const p = cfg?.papeis?.[papel] ?? PREM_PADRAO[papel] ?? PREM_PADRAO["Analista"]
+export function premDe(
+  cfg: Partial<Config> | undefined,
+  papel: Papel,
+  /** exceção da pessoa (§2.1): o nível mais específico vence */
+  excecao?: Partial<PremissasCargoEntrada>
+): PremissasCargo {
+  const base = cfg?.papeis?.[papel] ?? PREM_PADRAO[papel] ?? PREM_PADRAO["Analista"]
+  const p = excecao ? { ...base, ...excecao } : base
   const tol = p.tolerancia === undefined ? 0 : p.tolerancia
   const Cl = p.jornada * (1 - p.fatorAusencia / 100) - p.tempoInstitucional
   const semanaCap = p.maxHorasSemana === undefined ? 99 : p.maxHorasSemana

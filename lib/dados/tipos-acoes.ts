@@ -12,6 +12,8 @@ export interface ProjetoEntrada {
   health: Health
   prioridade: Prioridade
   produtos: { relatorios: number; dashboards: number; integracoes: number }
+  /** desvio de cronograma em dias (§3.3) */
+  atrasoDias?: number
   /** cadeiras escolhidas à mão, por uuid de cargo; as demais ficam em automático */
   squad: Record<string, string>
 }
@@ -73,6 +75,8 @@ export interface ResumoCenario {
   estabilidade: number | null
   solverMs: number
   ocorrencias: number
+  /** violações das restrições rígidas R1 a R13 no horizonte; esperado zero */
+  violacoes?: number
 }
 
 export interface CenarioLista {

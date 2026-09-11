@@ -595,6 +595,7 @@ function DetalheCerimonia({
         {ev.sla ? <Selo tom="ruim">SLA {ev.prazoDias}d</Selo> : null}
         {ancorada ? <Selo tom="acento">ancorada</Selo> : null}
         {!ev.obrig ? <Selo tom="neutro">opcional</Selo> : null}
+        {ev.origem ? <Selo tom="acento">modificador: {ev.origem}</Selo> : null}
       </div>
       <SecCab titulo="Por que este horário" />
       <ul className="nota" style={{ display: "grid", gap: 6, paddingLeft: 18, listStyle: "disc" }}>

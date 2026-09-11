@@ -112,6 +112,7 @@ export async function salvarProjeto(d: ProjetoEntrada): Promise<Resultado<string
         mes: Math.min(Math.max(1, Math.round(d.mes)), 48),
         health: d.health,
         prioridade: d.prioridade,
+        atraso_dias: Math.max(0, Math.round(d.atrasoDias ?? 0)),
       }
       const id = d.id
         ? (checar(await sb.from("projetos").update(linha).eq("id", d.id).select("id").single()).id as string)
@@ -490,6 +491,45 @@ export async function restaurarPremissasGerais(): Promise<Resultado> {
     }
     for (const [nivel, peso] of Object.entries(CLIENTES_PADRAO))
       checar(await sb.from("prioridades_cliente").update({ peso }).eq("nivel", nivel as "alta" | "media" | "baixa"))
+    return null
+  })
+}
+
+// ─────────────────────── modificadores e exceções (E14) ───────────────────────
+
+/** Liga ou desliga os modificadores automáticos do playbook (§3.3); remonta os squads. */
+export async function definirModificadores(ativo: boolean): Promise<Resultado> {
+  return executar(
+    async (sb) => {
+      await gravarGeral(sb, "modificadores_automaticos", ativo)
+      return null
+    },
+    { remontar: true }
+  )
+}
+
+// campos que a pessoa pode ajustar para si, na unidade do motor
+const CAMPOS_EXCECAO = ["focoProt", "blocoFocoMin", "maxHorasDia", "maxReunioesDia"]
+
+/**
+ * Exceção de premissa para uma pessoa (§2.1): a janela protegida definida pela própria pessoa
+ * é a mitigação do risco de rejeição do §12. `null` volta ao valor do cargo.
+ */
+export async function definirExcecaoPessoa(pessoaId: string, campo: string, valor: number | null): Promise<Resultado> {
+  return executar(async (sb) => {
+    if (!CAMPOS_EXCECAO.includes(campo)) throw new Error("Esse campo não aceita exceção por pessoa.")
+    const hoje = new Date().toISOString().slice(0, 10)
+    checar(
+      await sb
+        .from("premissas_override")
+        .update({ vigencia_fim: hoje })
+        .eq("escopo", "pessoa")
+        .eq("escopo_id", pessoaId)
+        .eq("campo", campo)
+        .is("vigencia_fim", null)
+    )
+    if (valor !== null)
+      checar(await sb.from("premissas_override").insert({ escopo: "pessoa", escopo_id: pessoaId, campo, valor }))
     return null
   })
 }

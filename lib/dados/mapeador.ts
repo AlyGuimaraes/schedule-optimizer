@@ -105,6 +105,8 @@ export interface PlanoBanco {
   publicado: { id: string; nome: string; publicado_em: string } | null
   ancoras: { projeto_id: string; playbook_item_id: string; dia: number; slot: number }[]
   ocorrencias: { projeto_id: string; playbook_item_id: string; semana: number; dia: number; slot: number }[]
+  /** exceções por pessoa (§2.1), campo e valor já na unidade do motor */
+  excecoes?: { pessoa_id: string; campo: string; valor: number }[]
 }
 
 /**
@@ -133,6 +135,14 @@ export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco): DadosMundo {
     if (k) vigente[`${k}|${o.semana}`] = { dia: o.dia, slot: o.slot }
   })
 
+  const pessoa = new Map(dados.indices.pessoas.map((id, i) => [id, i]))
+  const excecoes: Record<number, Partial<PremissasCargoEntrada>> = {}
+  ;(plano.excecoes ?? []).forEach((x) => {
+    const i = pessoa.get(x.pessoa_id)
+    if (i === undefined || typeof x.valor !== "number") return
+    excecoes[i] = { ...(excecoes[i] ?? {}), [x.campo]: x.valor }
+  })
+
   return {
     ...dados,
     config: {
@@ -140,6 +150,7 @@ export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco): DadosMundo {
       ancoras: Object.keys(ancoras).length ? ancoras : undefined,
       planoVigente: Object.keys(vigente).length ? vigente : undefined,
       pesoEstabilidade: 3,
+      excecoesPessoa: Object.keys(excecoes).length ? excecoes : undefined,
     },
     vigente: plano.publicado
       ? { id: plano.publicado.id, nome: plano.publicado.nome, publicadoEm: plano.publicado.publicado_em }
@@ -285,6 +296,7 @@ export function mapearMundo(
       },
       mes: pr.mes,
       timeId,
+      atrasoDias: pr.atraso_dias ?? 0,
     }
   })
 
@@ -302,6 +314,7 @@ export function mapearMundo(
     geral: mapearGerais(b.premissas_gerais),
     etapas: urgencias,
     clientes: { ...b.prioridades },
+    ...(b.premissas_gerais.modificadores_automaticos === true ? { modificadores: true } : {}),
   }
 
   const indices: Indices = {

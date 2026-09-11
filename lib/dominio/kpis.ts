@@ -16,7 +16,7 @@ export function kpis(
 ): KpiCenario {
   const G = geralDe(cfg)
   const porPessoa: KpiPessoa[] = pessoas.map((p) => {
-    const c = premDe(cfg, p.papel)
+    const c = premDe(cfg, p.papel, cfg?.excecoesPessoa?.[p.id])
     let horas = 0
     let reunioes = 0
     let foco = 0

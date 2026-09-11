@@ -1,9 +1,20 @@
+import { papeisModificadores } from "./modificadores"
 import { membrosDoTime } from "./times"
-import type { Mundo, Papel, Projeto } from "./tipos"
+import type { Config, Mundo, Papel, Projeto } from "./tipos"
 
 /** Cargos que a fase exige, vindos do playbook da etapa. */
 export function papeisNecessarios(mundo: Mundo, fase: string): Papel[] {
   return [...new Set((mundo.playbook[fase] ?? []).flatMap((c) => c.papeis))]
+}
+
+/**
+ * Cargos que o projeto exige: os da fase e, com os modificadores automáticos ligados (§3.3),
+ * os da sala de guerra nos projetos em vermelho e o do checkpoint nos de cliente prioritário.
+ */
+export function papeisDoProjeto(mundo: Mundo, pr: Projeto, cfg?: Partial<Config>): Papel[] {
+  const base = papeisNecessarios(mundo, pr.fase)
+  if (!cfg?.modificadores) return base
+  return [...new Set([...base, ...papeisModificadores(mundo, pr)])]
 }
 
 export function cargaDeProjetos(mundo: Mundo): Record<number, number> {
@@ -36,8 +47,8 @@ export function menosCarregado(
 }
 
 /** Garante que o squad cobre exatamente os cargos exigidos pela fase, só com gente do time. */
-export function montarSquad(mundo: Mundo, pr: Projeto): Projeto {
-  const nec = papeisNecessarios(mundo, pr.fase)
+export function montarSquad(mundo: Mundo, pr: Projeto, cfg?: Partial<Config>): Projeto {
+  const nec = papeisDoProjeto(mundo, pr, cfg)
   const squad: Record<Papel, number | undefined> = {}
   const carga = cargaDeProjetos(mundo)
   const elegiveis = membrosDoTime(mundo, pr.timeId)
@@ -64,20 +75,20 @@ export function montarSquad(mundo: Mundo, pr: Projeto): Projeto {
 }
 
 /** Cargos obrigatórios sem cadeira: a cerimônia não acontece, por falta de quórum (§3.2). */
-export function squadIncompleto(mundo: Mundo, pr: Projeto): Papel[] {
-  return papeisNecessarios(mundo, pr.fase).filter(
+export function squadIncompleto(mundo: Mundo, pr: Projeto, cfg?: Partial<Config>): Papel[] {
+  return papeisDoProjeto(mundo, pr, cfg).filter(
     (pp) => pr.squad[pp] === undefined || pr.squad[pp] === null
   )
 }
 
 /** Redistribui todas as cadeiras pela menor carga. Ação explícita de gestão (R21). */
-export function rebalancearAlocacao(mundo: Mundo): void {
+export function rebalancearAlocacao(mundo: Mundo, cfg?: Partial<Config>): void {
   const carga: Record<number, number> = {}
   mundo.pessoas.forEach((p) => {
     carga[p.id] = 0
   })
   mundo.projetos.forEach((pr) => {
-    const nec = papeisNecessarios(mundo, pr.fase)
+    const nec = papeisDoProjeto(mundo, pr, cfg)
     const squad: Record<Papel, number | undefined> = {}
     nec.forEach((pp) => {
       const usados = Object.values(squad)

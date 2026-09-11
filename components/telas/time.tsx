@@ -16,6 +16,7 @@ import {
   tomOcupacao,
 } from "@/components/cadencia/primitivas"
 import {
+  definirExcecaoPessoa,
   excluirCargo,
   excluirPessoa,
   excluirTime,
@@ -143,7 +144,12 @@ function AbaPessoas({ ctx }: { ctx: Contexto }) {
                 const corMes = mes.horas > kp.maxHorasMes ? "var(--bad)" : mes.horas > kp.maxHorasMes * 0.9 ? "var(--warn)" : "var(--ink)"
                 return (
                   <tr key={p.id}>
-                    <td><b>{p.nome}</b></td>
+                    <td>
+                      <b>{p.nome}</b>
+                      {config.excecoesPessoa?.[p.id] ? (
+                        <div className="meta" style={{ color: "var(--accent-ink)" }}>com exceção de premissa</div>
+                      ) : null}
+                    </td>
                     <td className="meta">{p.papel}</td>
                     <td className="n">{n1(kp.Cl)}</td>
                     <td className="n">{kp.produtivoMin}%</td>
@@ -224,6 +230,14 @@ function AbaPessoas({ ctx }: { ctx: Contexto }) {
   )
 }
 
+// Exceções que a pessoa pode ter em relação ao cargo (§2.1). esc converte horas em slots do motor.
+const CAMPOS_EXCECAO = [
+  { k: "focoProt", lb: "Janela protegida", un: "h", esc: 2, min: 0, max: 4, passo: 0.5 },
+  { k: "blocoFocoMin", lb: "Bloco mínimo de foco", un: "h", esc: 2, min: 1, max: 4, passo: 0.5 },
+  { k: "maxHorasDia", lb: "Máx. horas por dia", un: "h", esc: 1, min: 0.5, max: 8, passo: 0.5 },
+  { k: "maxReunioesDia", lb: "Máx. reuniões por dia", un: "", esc: 1, min: 1, max: 10, passo: 1 },
+] as const
+
 function EditorPessoa({ ctx, idx, onFechar }: { ctx: Contexto; idx: number | null; onFechar: () => void }) {
   const { mundo, config, indices } = ctx
   const p = idx !== null ? mundo.pessoas[idx] : null
@@ -232,14 +246,35 @@ function EditorPessoa({ ctx, idx, onFechar }: { ctx: Contexto; idx: number | nul
   const [papel, setPapel] = useState(p?.papel ?? papeis[0])
   const acao = useAcao()
   const projs = p ? mundo.projetos.filter((pr) => Object.values(pr.squad).includes(p.id)) : []
+  const inicial = p ? (config.excecoesPessoa?.[p.id] ?? {}) : {}
+  const [textoInicial] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      CAMPOS_EXCECAO.map((c) => [c.k, inicial[c.k] !== undefined ? String((inicial[c.k] as number) / c.esc) : ""])
+    )
+  )
+  const [exc, setExc] = useState<Record<string, string>>(textoInicial)
+  const doCargo = config.papeis[papel]
 
   const salvar = () => {
     if (!nome.trim()) {
       acao.setErro("Informe o nome.")
       return
     }
+    const mudancas = p ? CAMPOS_EXCECAO.filter((c) => (exc[c.k] ?? "") !== (textoInicial[c.k] ?? "")) : []
     acao.executar(
-      () => salvarPessoa({ id: p ? indices.pessoas[p.id] : null, nome: nome.trim(), cargoId: indices.cargos[papel] }),
+      async () => {
+        const r = await salvarPessoa({ id: p ? indices.pessoas[p.id] : null, nome: nome.trim(), cargoId: indices.cargos[papel] })
+        if (!r.ok || !p) return r
+        for (const c of mudancas) {
+          const t = (exc[c.k] ?? "").trim()
+          const n = Number(t.replace(",", "."))
+          if (t !== "" && Number.isNaN(n)) continue
+          const valor = t === "" ? null : Math.min(Math.max(n, c.min), c.max) * c.esc
+          const r2 = await definirExcecaoPessoa(indices.pessoas[p.id], c.k, valor)
+          if (!r2.ok) return { ok: false as const, erro: r2.erro }
+        }
+        return r
+      },
       "time atualizado, cenário replanejado",
       onFechar
     )
@@ -279,6 +314,32 @@ function EditorPessoa({ ctx, idx, onFechar }: { ctx: Contexto; idx: number | nul
             <span className="meta">
               Alocação atual: {projs.slice(0, 12).map((x) => x.nome).join(", ")}
               {projs.length > 12 ? " e outros" : ""}
+            </span>
+          </div>
+        ) : null}
+        {p ? (
+          <div className="l4">
+            <SecCab titulo="Exceções desta pessoa" apoio="o nível mais específico vence o do cargo" style={{ marginBottom: 10 }} />
+            <div className="form">
+              {CAMPOS_EXCECAO.map((c) => (
+                <div key={c.k} className="campo">
+                  <label htmlFor={`ex-${c.k}`}>{c.lb}</label>
+                  <input
+                    id={`ex-${c.k}`}
+                    type="number"
+                    min={c.min}
+                    max={c.max}
+                    step={c.passo}
+                    value={exc[c.k] ?? ""}
+                    placeholder={`cargo: ${n1((doCargo?.[c.k] ?? 0) / c.esc)}${c.un}`}
+                    onChange={(e) => setExc({ ...exc, [c.k]: e.target.value })}
+                  />
+                </div>
+              ))}
+            </div>
+            <span className="dica">
+              Em branco segue o cargo. A janela protegida definida pela própria pessoa é a mitigação que o §12 propõe
+              contra a rejeição da agenda pelo time.
             </span>
           </div>
         ) : null}
