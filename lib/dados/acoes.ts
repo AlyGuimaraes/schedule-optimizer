@@ -536,3 +536,31 @@ export async function definirExcecaoPessoa(pessoaId: string, campo: string, valo
     return null
   })
 }
+
+// campos que um projeto pode ajustar, em slots de 30 min
+const CAMPOS_EXCECAO_PROJETO = ["inicioMin", "fimMax", "duracaoMax"]
+
+/**
+ * Exceção de premissa para um projeto (§2.1): janela combinada com o cliente e duração máxima
+ * das cerimônias dele. `null` remove a exceção e o projeto volta a seguir o cargo.
+ */
+export async function definirExcecaoProjeto(projetoId: string, campo: string, valor: number | null): Promise<Resultado> {
+  return executar(async (sb) => {
+    if (!CAMPOS_EXCECAO_PROJETO.includes(campo)) throw new Error("Esse campo não aceita exceção por projeto.")
+    if (valor !== null && (!Number.isInteger(valor) || valor < 0 || valor > 20))
+      throw new Error("O horário precisa estar dentro do dia de trabalho.")
+    const hoje = new Date().toISOString().slice(0, 10)
+    checar(
+      await sb
+        .from("premissas_override")
+        .update({ vigencia_fim: hoje })
+        .eq("escopo", "projeto")
+        .eq("escopo_id", projetoId)
+        .eq("campo", campo)
+        .is("vigencia_fim", null)
+    )
+    if (valor !== null)
+      checar(await sb.from("premissas_override").insert({ escopo: "projeto", escopo_id: projetoId, campo, valor }))
+    return null
+  })
+}

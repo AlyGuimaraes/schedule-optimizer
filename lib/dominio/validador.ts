@@ -66,6 +66,11 @@ export function validarPlano(
     const s = ev.slot as number
     const h = ev.dur / 60
     const relaxada = !!ev.relaxado
+    const xp = cfg.excecoesProjeto?.[ev.projetoId]
+
+    // §2.1: janela combinada com o cliente do projeto
+    if ((xp?.inicioMin !== undefined && s < xp.inicioMin) || (xp?.fimMax !== undefined && s + ev.slots > xp.fimMax))
+      v.push({ regra: "§2.1", descricao: "fora da janela combinada com o cliente", cerimonia: ev.tipo })
 
     ev.participantes.forEach((p) => {
       const c = prem(p)
@@ -105,7 +110,7 @@ export function validarPlano(
         v.push({ regra: "R6", descricao: "invade a janela protegida", pessoa: nome(p), cerimonia: ev.tipo, valor: s, limite: janela })
 
       // R7: duração máxima da cerimônia para o cargo
-      const durMax = c.duracaoMax + (relaxada ? PF.extraDuracao : 0)
+      const durMax = (xp?.duracaoMax ?? c.duracaoMax) + (relaxada ? PF.extraDuracao : 0)
       if (ev.slots > durMax)
         v.push({ regra: "R7", descricao: "cerimônia mais longa que o máximo do cargo", pessoa: nome(p), cerimonia: ev.tipo, valor: ev.slots / 2, limite: durMax / 2 })
 

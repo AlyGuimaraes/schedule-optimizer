@@ -13,7 +13,7 @@ import {
   Trilha,
   VazioTela,
 } from "@/components/cadencia/primitivas"
-import { excluirProjeto, salvarProjeto } from "@/lib/dados/acoes"
+import { definirExcecaoProjeto, excluirProjeto, salvarProjeto } from "@/lib/dados/acoes"
 import {
   etapaDe,
   membrosDoTime,
@@ -26,13 +26,17 @@ import {
 } from "@/lib/dominio"
 import { useAcao } from "@/lib/estado/acao"
 import { useParametro } from "@/lib/estado/url"
-import { n1, primeiro } from "@/lib/formato"
+import { hhmm, n1, primeiro } from "@/lib/formato"
 
 import { fatorMes, pessoaHora, resultadoDe } from "./comum"
 
 export function TelaProjetos() {
   return <ComDados>{(ctx) => <Projetos {...ctx} />}</ComDados>
 }
+
+// exceções que um projeto pode ter (§2.1), em slots de 30 minutos
+const CAMPOS_PROJETO = ["inicioMin", "fimMax", "duracaoMax"] as const
+type CampoProjeto = (typeof CAMPOS_PROJETO)[number]
 
 interface Rascunho {
   idx: number | null
@@ -358,6 +362,16 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
   const membros = membrosDoTime(mundo, d.time)
   const original = d.idx !== null ? mundo.projetos[d.idx] : null
   const atualizar = (parcial: Partial<Rascunho>) => setD((x) => ({ ...x, ...parcial }))
+  // exceções do projeto (§2.1), em slots; texto vazio segue o cargo
+  const [excTexto] = useState<Record<CampoProjeto, string>>(() => {
+    const x = original ? (config.excecoesProjeto?.[original.id] ?? {}) : {}
+    return {
+      inicioMin: x.inicioMin !== undefined ? String(x.inicioMin) : "",
+      fimMax: x.fimMax !== undefined ? String(x.fimMax) : "",
+      duracaoMax: x.duracaoMax !== undefined ? String(x.duracaoMax) : "",
+    }
+  })
+  const [exc, setExc] = useState(excTexto)
 
   const salvar = () => {
     if (!d.nome.trim()) {
@@ -369,9 +383,14 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
       const pid = d.squad[pp]
       if (pid !== undefined && membros.includes(pid)) squad[indices.cargos[pp]] = indices.pessoas[pid]
     })
+    if (exc.inicioMin && exc.fimMax && Number(exc.fimMax) <= Number(exc.inicioMin)) {
+      acao.setErro("A janela do cliente termina antes de começar.")
+      return
+    }
+    const mudancas = original ? CAMPOS_PROJETO.filter((k) => exc[k] !== excTexto[k]) : []
     acao.executar(
-      () =>
-        salvarProjeto({
+      async () => {
+        const r = await salvarProjeto({
           id: d.idx !== null ? indices.projetos[d.idx] : null,
           nome: d.nome.trim(),
           cliente: clienteDoNome(d.nome),
@@ -383,7 +402,14 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
           produtos: { relatorios: d.rel, dashboards: d.dash, integracoes: d.integ },
           atrasoDias: d.atraso,
           squad,
-        }),
+        })
+        if (!r.ok || !original) return r
+        for (const k of mudancas) {
+          const r2 = await definirExcecaoProjeto(indices.projetos[original.id], k, exc[k] === "" ? null : Number(exc[k]))
+          if (!r2.ok) return { ok: false as const, erro: r2.erro }
+        }
+        return r
+      },
       "projeto salvo, cenário replanejado",
       onFechar
     )
@@ -470,6 +496,54 @@ function EditorProjeto({ ctx, inicial, onFechar }: { ctx: Contexto; inicial: Ras
           />
           <span className="dica">Acima de 10, com os modificadores ligados, dobra a cadência do status report.</span>
         </div>
+        {original ? (
+          <div className="l4">
+            <SecCab
+              titulo="Exceções deste projeto"
+              apoio="combinadas com o cliente, valem para todas as cerimônias dele"
+              style={{ marginBottom: 10 }}
+            />
+            <div className="form">
+              <div className="campo">
+                <label htmlFor="exInicio">Começar a partir de</label>
+                <select id="exInicio" value={exc.inicioMin} onChange={(e) => setExc({ ...exc, inicioMin: e.target.value })}>
+                  <option value="">sem restrição</option>
+                  {Array.from({ length: 19 }, (_, s) => (
+                    <option key={s} value={s}>
+                      {hhmm(s)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo">
+                <label htmlFor="exFim">Terminar até</label>
+                <select id="exFim" value={exc.fimMax} onChange={(e) => setExc({ ...exc, fimMax: e.target.value })}>
+                  <option value="">sem restrição</option>
+                  {Array.from({ length: 19 }, (_, i) => i + 2).map((s) => (
+                    <option key={s} value={s}>
+                      {hhmm(s)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo l2">
+                <label htmlFor="exDuracao">Duração máxima das cerimônias</label>
+                <select id="exDuracao" value={exc.duracaoMax} onChange={(e) => setExc({ ...exc, duracaoMax: e.target.value })}>
+                  <option value="">a do cargo</option>
+                  {[1, 2, 3, 4, 5, 6, 8].map((n) => (
+                    <option key={n} value={n}>
+                      {String(n / 2).replace(".", ",")}h
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <span className="dica">
+              A janela soma-se às janelas protegidas das pessoas. A duração máxima do projeto vence a do cargo, por ser o
+              nível mais específico: serve para o cliente que pede workshop de 3h ou reunião de no máximo 30 minutos.
+            </span>
+          </div>
+        ) : null}
         <div className="l4">
           <SecCab
             titulo="Squad"

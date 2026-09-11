@@ -158,9 +158,9 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E09 | Importação da agenda atual | 1 Fundação | E03, E04 | 6 | ⬜ |
 | E10 | Tela Cockpit | 2 Otimizador | E01, E04 | 3 | ✅ |
 | E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | 🟡 seleção inicial depende do login |
-| E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | 🟡 validador na execução salva |
-| E13 | Cenários, publicação e estabilidade | 2 Otimizador | E12 | 5 | 🟡 falta 48h, corte de 20% e seletor global |
-| E14 | Premissas avançadas e modificadores automáticos | 2 Otimizador | E07, E12 | 4 | ⬜ |
+| E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | ✅ |
+| E13 | Cenários, publicação e estabilidade | 2 Otimizador | E12 | 5 | ✅ |
+| E14 | Premissas avançadas e modificadores automáticos | 2 Otimizador | E07, E12 | 4 | ✅ |
 | E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | ⬜ |
 | E16 | Escrita nos calendários e reconciliação | 2 Otimizador | E09, E13 | 8 | ⬜ |
 | E17 | **Marco MVP**: aceite, hardening e go-live | 2 Otimizador | E05 a E16 | 5 | ⬜ |
@@ -534,7 +534,7 @@ flowchart LR
 
 **Critérios de aceite.** Seleções combinam por interseção; nada marcado significa tudo; blocos simultâneos nunca se sobrepõem; rolagem fluida com o time inteiro.
 
-#### E12 · Tela Otimizador e execução persistida · 🟡
+#### E12 · Tela Otimizador e execução persistida · ✅
 
 **Objetivo.** Replicar o Otimizador (L2040) e gravar cada execução.
 **Requisitos.** R09, R11, R22, R23, R24, R25, R36, R46, §4.3, §4.4, §7.3, critérios 3, 4 e 5.
@@ -551,7 +551,7 @@ flowchart LR
 
 **Critérios de aceite.** Tela idêntica ao protótipo; nenhuma violação rígida em 100 sementes; execução gravada e recarregável.
 
-#### E13 · Cenários, publicação e estabilidade · 🟡
+#### E13 · Cenários, publicação e estabilidade · ✅
 
 **Objetivo.** Implementar o fluxo de simulação de cenário (§10) e as premissas de estabilidade e antecedência (§2.2).
 **Requisitos.** R24, §2.2, §10, §12.
@@ -567,13 +567,13 @@ flowchart LR
 
 **Critérios de aceite.** Publicar gera um plano vigente imutável; replanejar mantém pelo menos 80% das ocorrências.
 
-#### E14 · Premissas avançadas e modificadores automáticos · ⬜
+#### E14 · Premissas avançadas e modificadores automáticos · ✅
 
 **Objetivo.** Completar os escopos de premissa (§2.1) e os modificadores do playbook (§3.3), e trocar a semana abstrata por datas reais.
 **Requisitos.** §2.1, §3.3, §12.
 
 - [x] Exceções por pessoa (`premissas_override`, escopo pessoa) com vigência: janela protegida, bloco mínimo de foco, máximo de horas e de reuniões por dia, editáveis no modal da pessoa; precedência Gerais → Cargo → Pessoa, o mais específico vence (`premDe`), respeitada pelo motor, pelos indicadores e pelo validador
-- [ ] Exceções por projeto (escopo projeto): o esquema já aceita; falta definir quais campos fazem sentido por projeto
+- [x] Exceções por projeto (escopo projeto, migração 0009): janela combinada com o cliente (começar a partir de, terminar até), que se soma às janelas das pessoas, e duração máxima das cerimônias, que vence a do cargo; editáveis no modal do projeto e conferidas pelo validador
 - [x] Janela protegida da pessoa (§12): editável no modal; a edição pela própria pessoa, no perfil, depende do login (D-13)
 - [x] Modificadores determinísticos na geração da demanda, cada um visível com a origem (selo no detalhe da Agenda): volume de produtos (mais uma validação a cada 3 produtos acima da mediana), health amarelo (status report semanal), health vermelho (sala de guerra semanal escalada ao Líder Técnico), cliente de prioridade alta (checkpoint executivo mensal em todas as fases), atraso acima de 10 dias (dobra a cadência de status report). Chave em Premissas › Gerais, desligada por padrão para manter os números de referência; ligar remonta os squads
 - [x] Ausências e feriados nacionais e municipais reduzindo a capacidade por dia; cadastro manual até a E23. Tabela `ausencias` (migração 0008) com os feriados nacionais de 2026 e 2027, aba Time › Ausências, dia fora na Agenda e no motor, teto semanal proporcional aos dias disponíveis, regra no validador

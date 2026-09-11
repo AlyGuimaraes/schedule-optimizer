@@ -11,6 +11,7 @@ import type {
   Config,
   DiaProtegido,
   Etapa,
+  ExcecaoProjeto,
   Health,
   ItemPlaybook,
   Mundo,
@@ -117,6 +118,8 @@ export interface PlanoBanco {
   ocorrencias: { projeto_id: string; playbook_item_id: string; semana: number; dia: number; slot: number }[]
   /** exceções por pessoa (§2.1), campo e valor já na unidade do motor */
   excecoes?: { pessoa_id: string; campo: string; valor: number }[]
+  /** exceções por projeto (§2.1): janela do cliente e duração máxima, em slots */
+  excecoes_projeto?: { projeto_id: string; campo: string; valor: number }[]
   /** ausências e feriados (E14); pessoa nula vale para todos */
   ausencias?: AusenciaBanco[]
   /** início real de cada série (defeito 8) */
@@ -243,11 +246,19 @@ export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco, agoraMs = Dat
     excecoes[i] = { ...(excecoes[i] ?? {}), [x.campo]: x.valor }
   })
 
+  const excecoesProjeto: Record<number, ExcecaoProjeto> = {}
+  ;(plano.excecoes_projeto ?? []).forEach((x) => {
+    const i = projeto.get(x.projeto_id)
+    if (i === undefined || typeof x.valor !== "number") return
+    excecoesProjeto[i] = { ...(excecoesProjeto[i] ?? {}), [x.campo]: x.valor }
+  })
+
   return {
     ...dados,
     config: {
       ...dados.config,
       ancoras: Object.keys(ancoras).length ? ancoras : undefined,
+      excecoesProjeto: Object.keys(excecoesProjeto).length ? excecoesProjeto : undefined,
       planoVigente: Object.keys(vigente).length ? vigente : undefined,
       pesoEstabilidade: 3,
       excecoesPessoa: Object.keys(excecoes).length ? excecoes : undefined,

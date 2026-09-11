@@ -104,12 +104,18 @@ export function otimizar(
     r && PF.cedeJanela ? Math.max(0, PP[p].focoProt - 2) : PP[p].focoProt
   const durEf = (p: number, r: boolean) => PP[p].duracaoMax + (r ? PF.extraDuracao : 0)
 
+  // exceção do projeto (§2.1): janela combinada com o cliente e duração máxima própria
+  const excProj = (ev?: Cerimonia) => (ev ? cfg.excecoesProjeto?.[ev.projetoId] : undefined)
+
   // toda restrição de cargo é avaliada participante a participante, e a mais restritiva vence (§4.2)
-  function viavel(parts: number[], d: number, s: number, slots: number, h: number, r: boolean) {
+  function viavel(parts: number[], d: number, s: number, slots: number, h: number, r: boolean, ev?: Cerimonia) {
+    const xp = excProj(ev)
+    if (xp?.inicioMin !== undefined && s < xp.inicioMin) return false
+    if (xp?.fimMax !== undefined && s + slots > xp.fimMax) return false
     for (const p of parts) {
       if (fora(p, d)) return false
       if (s < Math.max(G.inicio, janelaEf(p, r))) return false
-      if (slots > durEf(p, r)) return false
+      if (slots > (xp?.duracaoMax !== undefined ? xp.duracaoMax + (r ? PF.extraDuracao : 0) : durEf(p, r))) return false
       if (!livre(oc, p, d, s, slots, G, true)) return false
       if (porDia[p][d] + 1 > reunEf(p, r)) return false
       if (hDia[p][d] + h > horasEf(p, r) + 1e-9) return false
@@ -146,7 +152,7 @@ export function otimizar(
     for (let d = 0; d < DIAS; d++)
       for (let s = G.inicio; s + slots <= G.fim; s++) {
         if (posicaoNaSemana(d, s) < congelado) continue
-        if (!viavel(parts, d, s, slots, h, r)) continue
+        if (!viavel(parts, d, s, slots, h, r, ev)) continue
         const c = custo(parts, d, s, slots, ev)
         if (m === null || c < m.custo) m = { d, s, custo: c }
       }
@@ -167,8 +173,9 @@ export function otimizar(
         cedidas.push({ premissa: "máx. horas/dia", alvo: c.maxHorasDia, valor: hDia[p][d] + h, un: "h" })
       if (s < c.focoProt)
         cedidas.push({ premissa: "janela protegida", alvo: c.focoProt / 2, valor: s / 2, un: "h" })
-      if (ev.slots > c.duracaoMax)
-        cedidas.push({ premissa: "duração máx. da reunião", alvo: c.duracaoMax / 2, valor: ev.slots / 2, un: "h" })
+      const durAlvo = excProj(ev)?.duracaoMax ?? c.duracaoMax
+      if (ev.slots > durAlvo)
+        cedidas.push({ premissa: "duração máx. da reunião", alvo: durAlvo / 2, valor: ev.slots / 2, un: "h" })
       cedidas.forEach((x) =>
         concessoes.push({
           evId: ev.id,
@@ -235,7 +242,7 @@ export function otimizar(
       const cabe = (r: boolean) =>
         ev.participantes.every(
           (p) => carga[p] + h <= tetoEf(p, r) + 1e-9 && acum[p] + carga[p] + h <= tetoMes(p) + 1e-9
-        ) && viavel(ev.participantes, v.dia, v.slot, ev.slots, h, r)
+        ) && viavel(ev.participantes, v.dia, v.slot, ev.slots, h, r, ev)
       if (cabe(false)) confirmar(ev, { d: v.dia, s: v.slot }, false)
       else if (ev.obrig && cabe(true)) confirmar(ev, { d: v.dia, s: v.slot }, true)
       else return

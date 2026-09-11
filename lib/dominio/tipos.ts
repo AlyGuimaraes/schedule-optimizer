@@ -151,10 +151,25 @@ export interface Config {
   modificadores?: boolean
   /** Exceções por pessoa (§2.1), pelo índice da pessoa: o nível mais específico vence o cargo. */
   excecoesPessoa?: Record<number, Partial<PremissasCargoEntrada>>
+  /** Exceções por projeto (§2.1), pelo índice do projeto: janela do cliente e duração máxima. */
+  excecoesProjeto?: Record<number, ExcecaoProjeto>
   /** Fração máxima de cerimônias movidas por ciclo (§2.2), só com plano vigente; 0,2 por padrão. */
   limiteMovidas?: number
   /** Datas reais do horizonte. Ausente, o motor usa a semana abstrata do protótipo. */
   calendario?: Calendario
+}
+
+/**
+ * Exceção de um projeto (§2.1), em slots de 30 minutos. A janela combinada com o cliente soma-se
+ * às restrições das pessoas; a duração máxima, por ser o nível mais específico, vence a do cargo.
+ */
+export interface ExcecaoProjeto {
+  /** primeiro slot em que as cerimônias do projeto podem começar */
+  inicioMin?: number
+  /** slot em que elas precisam ter terminado */
+  fimMax?: number
+  /** duração máxima das cerimônias do projeto */
+  duracaoMax?: number
 }
 
 /** Horizonte ancorado no calendário (E14): cadência real, ausências, feriados e antecedência. */
