@@ -155,7 +155,7 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ✅ |
 | E07 | Tela Premissas (Gerais, Por cargo, Urgência, Playbook) | 1 Fundação | E01, E04 | 5 | 🟡 governança depende do login |
 | E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | ✅ |
-| E09 | Importação da agenda atual | 1 Fundação | E03, E04 | 6 | ⬜ |
+| E09 | Importação da agenda atual | 1 Fundação | E03, E04 | 6 | 🟡 importação .ics e bloqueios prontos; Outlook depende do app registration |
 | E10 | Tela Cockpit | 2 Otimizador | E01, E04 | 3 | ✅ |
 | E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | 🟡 seleção inicial depende do login |
 | E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | ✅ |
@@ -485,7 +485,7 @@ flowchart LR
 
 **Critérios de aceite.** Números iguais ao motor; o export confere com a tela.
 
-#### E09 · Importação da agenda atual · ⬜
+#### E09 · Importação da agenda atual · 🟡
 
 **Objetivo.** Trocar a "Agenda atual" simulada pela agenda real e produzir os indicadores sobre ela (entrega da Fase 1 do roadmap e critério 1 do §13).
 **Requisitos.** §8, §11 Fase 1, critério 1.
@@ -493,11 +493,12 @@ flowchart LR
 - [ ] Outlook via Microsoft Graph (decisão D-10, 11/09/2026): app registration no Entra ID com permissão de aplicação `Calendars.Read` e consentimento do admin do tenant, o que cobre as 20 agendas com uma autorização só; leitura por `/users/{id}/calendarView` na janela importada
 - [ ] Opcional: restringir o acesso do app às caixas do time com uma application access policy do Exchange, para não ler agendas de fora da operação
 - [ ] Credenciais no Supabase Vault; tabela `integracoes_calendario`
-- [ ] Importador de N semanas: normaliza em slots de 30 minutos e classifica cada evento como cerimônia de projeto reconhecida (título, participantes e cliente), bloqueio opaco ou institucional
+- [x] Importador de N semanas: normaliza em slots de 30 minutos e classifica cada evento como cerimônia de projeto reconhecida (título, participantes e cliente), bloqueio opaco ou institucional (`lib/calendario/`, independente do provedor, com parser RFC 5545 próprio: fusos, dia inteiro, RRULE diária e semanal, EXDATE; mensal e anual importam só a primeira ocorrência)
+- [x] Compromissos importados que não são cerimônia reconhecida viram bloqueios no otimizador (§8), com o intervalo obrigatório, e o validador confere; aparecem hachurados na Agenda da pessoa (migração 0010, `carregar_plano().bloqueios`)
 - [ ] Tela de conciliação para eventos não reconhecidos, com sugestão da IA a partir da E19
-- [ ] Alternativa sem integração: upload de arquivo .ics por pessoa
+- [x] Alternativa sem integração: upload de arquivo .ics por pessoa, na aba Time › Agendas; o arquivo é lido no navegador e só os eventos normalizados vão ao servidor; reimportar substitui a janela, sem apagar nada se falhar no meio
 - [ ] O cenário "Agenda atual" passa a ser o importado; a baseline simulada fica como modo de demonstração
-- [ ] Privacidade: guardar só início, fim, participantes, ids e hash do título dos eventos opacos
+- [x] Privacidade: guardar só início, fim, participantes, ids e hash do título dos eventos opacos (SHA-256 sem sal, para casar a mesma reunião entre participantes; títulos curtos podem ser adivinhados por dicionário, avaliar sal por tenant)
 
 **Critérios de aceite.** Importar 20 agendas em menos de 2 minutos; indicadores por pessoa e cargo sobre dados reais; eventos opacos fora dos indicadores de cerimônia.
 
