@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // ambiente Python do solver (E15)
+    "solver/.venv/**",
   ]),
 ]);
 

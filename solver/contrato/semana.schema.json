@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cadencia:solver:semana:1",
+  "title": "Contrato do solver CP-SAT da Cadência (uma semana)",
+  "description": "Fonte única do contrato entre o motor TypeScript (lib/solver/contrato.ts) e o serviço Python (solver/cadencia_solver/contrato.py). Horas em horas decimais, durações de cerimônia em minutos, horários em slots de 30 minutos a partir do início da grade, dias de 0 (segunda) a grade.dias - 1.",
+  "anyOf": [
+    { "$ref": "#/$defs/RequisicaoSemana" },
+    { "$ref": "#/$defs/RespostaSemana" }
+  ],
+  "$defs": {
+    "RequisicaoSemana": {
+      "type": "object",
+      "description": "Demanda de uma semana com tudo o que o solver precisa: premissas já resolvidas por pessoa, âncoras, plano vigente e a solução gulosa como dica.",
+      "additionalProperties": false,
+      "required": [
+        "versao",
+        "semana",
+        "grade",
+        "geral",
+        "perfil",
+        "pesoEstabilidade",
+        "permitirTroca",
+        "permitirRelaxar",
+        "pessoas",
+        "cerimonias"
+      ],
+      "properties": {
+        "versao": { "const": "1" },
+        "semana": { "type": "integer", "minimum": 1, "description": "semana do horizonte, base do orçamento mensal pró-rata" },
+        "grade": { "$ref": "#/$defs/Grade" },
+        "geral": { "$ref": "#/$defs/Geral" },
+        "perfil": { "$ref": "#/$defs/Perfil" },
+        "pesoEstabilidade": { "type": "number", "minimum": 0, "description": "custo de mover uma cerimônia do lugar que tinha no plano vigente (w6)" },
+        "permitirTroca": { "type": "boolean", "description": "camada 2: troca de cadeira por outra pessoa do mesmo cargo" },
+        "permitirRelaxar": { "type": "boolean", "description": "camada 3: relaxamento controlado, só para cerimônia obrigatória" },
+        "pessoas": { "type": "array", "items": { "$ref": "#/$defs/Pessoa" } },
+        "cerimonias": { "type": "array", "items": { "$ref": "#/$defs/Cerimonia" } },
+        "dica": {
+          "type": "array",
+          "description": "solução gulosa usada como warm start (AddHint)",
+          "items": { "$ref": "#/$defs/Dica" }
+        },
+        "opcoes": { "$ref": "#/$defs/Opcoes" }
+      }
+    },
+    "Grade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dias", "slotsDia"],
+      "properties": {
+        "dias": { "type": "integer", "minimum": 1 },
+        "slotsDia": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "Geral": {
+      "type": "object",
+      "description": "Premissas gerais (§2.2), em slots.",
+      "additionalProperties": false,
+      "required": [
+        "inicio",
+        "fim",
+        "almocoInicio",
+        "almocoDur",
+        "buffer",
+        "preferidos",
+        "pesoPreferencia",
+        "diaProtegido"
+      ],
+      "properties": {
+        "inicio": { "type": "integer", "minimum": 0 },
+        "fim": { "type": "integer", "minimum": 0 },
+        "almocoInicio": { "type": "integer", "minimum": 0 },
+        "almocoDur": { "type": "integer", "minimum": 0 },
+        "buffer": { "type": "integer", "minimum": 0 },
+        "preferidos": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "pesoPreferencia": { "type": "number", "minimum": 0 },
+        "diaProtegido": { "enum": ["nenhum", "sexta-tarde", "sexta"] }
+      }
+    },
+    "Perfil": {
+      "type": "object",
+      "description": "O que do perfil (§4.4) ainda pesa no objetivo. As folgas do perfil já chegam resolvidas em PremissasPessoa.",
+      "additionalProperties": false,
+      "required": ["id", "pesoFrag", "ancorar"],
+      "properties": {
+        "id": { "type": "string" },
+        "pesoFrag": { "type": "number", "minimum": 0 },
+        "ancorar": { "type": "boolean" }
+      }
+    },
+    "PremissasPessoa": {
+      "type": "object",
+      "description": "Premissas da pessoa já resolvidas (cargo com a exceção dela), no alvo e no máximo que o perfil autoriza ceder na camada 3.",
+      "additionalProperties": false,
+      "required": [
+        "teto",
+        "tetoRelaxado",
+        "maxReunioesDia",
+        "maxReunioesDiaRelaxado",
+        "maxHorasDia",
+        "maxHorasDiaRelaxado",
+        "focoProt",
+        "focoProtRelaxado",
+        "duracaoMax",
+        "duracaoMaxRelaxada",
+        "blocoFocoMin",
+        "orcamentoMensal"
+      ],
+      "properties": {
+        "teto": { "type": "number", "minimum": 0, "description": "teto semanal efetivo, em horas (R10)" },
+        "tetoRelaxado": { "type": "number", "minimum": 0, "description": "limite semanal aceitável que o perfil autoriza, em horas" },
+        "maxReunioesDia": { "type": "integer", "minimum": 0 },
+        "maxReunioesDiaRelaxado": { "type": "integer", "minimum": 0 },
+        "maxHorasDia": { "type": "number", "minimum": 0 },
+        "maxHorasDiaRelaxado": { "type": "number", "minimum": 0 },
+        "focoProt": { "type": "integer", "minimum": 0, "description": "primeiro slot livre da janela protegida (R6)" },
+        "focoProtRelaxado": { "type": "integer", "minimum": 0 },
+        "duracaoMax": { "type": "integer", "minimum": 0, "description": "em slots (R7)" },
+        "duracaoMaxRelaxada": { "type": "integer", "minimum": 0 },
+        "blocoFocoMin": { "type": "integer", "minimum": 0, "description": "em slots, para a fragmentação" },
+        "orcamentoMensal": { "type": "number", "minimum": 0, "description": "orçamento mensal pró-rata até esta semana, em horas (R11)" }
+      }
+    },
+    "Pessoa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nome", "papel", "acumulado", "premissas"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "nome": { "type": "string" },
+        "papel": { "type": "string" },
+        "acumulado": { "type": "number", "minimum": 0, "description": "horas já consumidas nas semanas anteriores do horizonte" },
+        "premissas": { "$ref": "#/$defs/PremissasPessoa" }
+      }
+    },
+    "Cadeira": {
+      "type": "object",
+      "description": "Uma cadeira do quórum (R12): o titular do squad e quem pode sentar no lugar dele na camada 2.",
+      "additionalProperties": false,
+      "required": ["papel", "titular", "candidatos"],
+      "properties": {
+        "papel": { "type": "string" },
+        "titular": { "type": "integer", "minimum": 0 },
+        "candidatos": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+      }
+    },
+    "Posicao": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dia", "slot"],
+      "properties": {
+        "dia": { "type": "integer", "minimum": 0 },
+        "slot": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Cerimonia": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "projetoId",
+        "projeto",
+        "tipo",
+        "dur",
+        "slots",
+        "cadeiras",
+        "obrigatoria",
+        "prio",
+        "sla",
+        "score"
+      ],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "projetoId": { "type": "integer", "minimum": 0 },
+        "projeto": { "type": "string" },
+        "tipo": { "type": "string" },
+        "dur": { "type": "integer", "minimum": 1, "description": "em minutos" },
+        "slots": { "type": "integer", "minimum": 1 },
+        "cadeiras": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Cadeira" } },
+        "obrigatoria": { "type": "boolean" },
+        "prio": { "type": "integer" },
+        "sla": { "type": "boolean", "description": "prazo crítico (w8)" },
+        "score": { "type": "number", "description": "urgência da etapa × peso do cliente (§2.5)" },
+        "ancora": { "$ref": "#/$defs/Posicao", "description": "horário imposto pelo cliente (§12)" },
+        "vigente": { "$ref": "#/$defs/Posicao", "description": "posição no plano publicado (w6)" }
+      }
+    },
+    "Dica": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cerimoniaId", "dia", "slot", "relaxada", "participantes"],
+      "properties": {
+        "cerimoniaId": { "type": "integer", "minimum": 0 },
+        "dia": { "type": "integer", "minimum": 0 },
+        "slot": { "type": "integer", "minimum": 0 },
+        "relaxada": { "type": "boolean" },
+        "participantes": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+      }
+    },
+    "Opcoes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "limiteSegundos": { "type": "number", "exclusiveMinimum": 0, "default": 60 },
+        "workers": { "type": "integer", "minimum": 1, "default": 8 },
+        "semente": { "type": "integer", "minimum": 0, "default": 0 },
+        "avaliarDica": {
+          "type": "boolean",
+          "default": true,
+          "description": "calcula o objetivo da dica no mesmo modelo, para comparar guloso e CP-SAT"
+        }
+      }
+    },
+    "RespostaSemana": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "versao",
+        "status",
+        "objetivo",
+        "limiteInferior",
+        "objetivoDica",
+        "ms",
+        "alocadas",
+        "naoAlocadas",
+        "concessoes",
+        "estatisticas"
+      ],
+      "properties": {
+        "versao": { "const": "1" },
+        "status": { "enum": ["otimo", "viavel", "inviavel", "sem_solucao", "invalido"] },
+        "objetivo": { "type": ["number", "null"] },
+        "limiteInferior": { "type": ["number", "null"] },
+        "objetivoDica": { "type": ["number", "null"], "description": "objetivo da dica gulosa no mesmo modelo, quando avaliada" },
+        "ms": { "type": "number", "minimum": 0 },
+        "alocadas": { "type": "array", "items": { "$ref": "#/$defs/Alocacao" } },
+        "naoAlocadas": { "type": "array", "items": { "$ref": "#/$defs/NaoAlocada" } },
+        "concessoes": { "type": "array", "items": { "$ref": "#/$defs/Concessao" } },
+        "estatisticas": { "$ref": "#/$defs/Estatisticas" }
+      }
+    },
+    "Troca": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["de", "para", "papel"],
+      "properties": {
+        "de": { "type": "integer", "minimum": 0 },
+        "para": { "type": "integer", "minimum": 0 },
+        "papel": { "type": "string" }
+      }
+    },
+    "Alocacao": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cerimoniaId", "dia", "slot", "camada", "participantes", "trocas", "relaxada", "ancorada"],
+      "properties": {
+        "cerimoniaId": { "type": "integer", "minimum": 0 },
+        "dia": { "type": "integer", "minimum": 0 },
+        "slot": { "type": "integer", "minimum": 0 },
+        "camada": { "enum": [1, 2, 3] },
+        "participantes": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "trocas": { "type": "array", "items": { "$ref": "#/$defs/Troca" } },
+        "relaxada": { "type": "boolean" },
+        "ancorada": { "type": "boolean" }
+      }
+    },
+    "NaoAlocada": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cerimoniaId", "motivo"],
+      "properties": {
+        "cerimoniaId": { "type": "integer", "minimum": 0 },
+        "motivo": { "type": "string" }
+      }
+    },
+    "Concessao": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cerimoniaId", "pessoaId", "premissa", "alvo", "valor", "un"],
+      "properties": {
+        "cerimoniaId": { "type": "integer", "minimum": 0 },
+        "pessoaId": { "type": "integer", "minimum": 0 },
+        "premissa": { "type": "string" },
+        "alvo": { "type": "number" },
+        "valor": { "type": "number" },
+        "un": { "type": "string" }
+      }
+    },
+    "Estatisticas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variaveis", "restricoes", "workers", "conflitos", "ramos", "tempoSolver"],
+      "properties": {
+        "variaveis": { "type": "integer", "minimum": 0 },
+        "restricoes": { "type": "integer", "minimum": 0 },
+        "workers": { "type": "integer", "minimum": 0 },
+        "conflitos": { "type": "integer", "minimum": 0 },
+        "ramos": { "type": "integer", "minimum": 0 },
+        "tempoSolver": { "type": "number", "minimum": 0, "description": "segundos de parede dentro do CP-SAT" }
+      }
+    }
+  }
+}

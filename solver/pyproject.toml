@@ -1,0 +1,25 @@
+[project]
+name = "cadencia-solver"
+version = "0.1.0"
+description = "Solver CP-SAT da Cadência: alocação semanal de cerimônias (E15)"
+requires-python = ">=3.12"
+dependencies = [
+  "ortools>=9.12,<10",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "pydantic>=2.9,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cadencia_solver"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
