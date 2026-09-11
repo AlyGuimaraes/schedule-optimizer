@@ -25,7 +25,7 @@
 | Supabase **Schedule Optimizer** | ✅ ref `bvccnzvvzidefhiakrez`, região sa-east-1 (São Paulo), Postgres 17, org Leverpro, linkado | `supabase/` |
 | Vercel **schedule-optimizer** | ✅ time LEVERPRO (`leverproint`), região de funções gru1, variáveis públicas do Supabase em production, preview e development | `.vercel/`, `vercel.json` |
 | Segredos locais | ✅ URL, publishable key, secret key e senha do banco em `.env.local`, fora do git | `.env.local` |
-| Repositório GitHub | ⛔ o token atual não tem permissão para criar repositório (ver seção 9) | |
+| Repositório GitHub | ✅ `AlyGuimaraes/schedule-optimizer`, privado, push por SSH | `origin` |
 | Documentos de referência | ✅ | `docs/referencia/` |
 
 ### 1.2 Decisão sobre o preset
@@ -82,10 +82,10 @@ Vercel, região gru1
   ├─ Server Actions e Route Handlers: cadastros, execução persistida do motor, relatórios
   ├─ Cron semanal de planejamento (sexta)
   ├─ Agentes de IA (Claude API, @anthropic-ai/sdk)
-  └─ Webhooks de calendário (Google Calendar, Microsoft Graph)
+  └─ Webhooks de calendário do Outlook (Microsoft Graph, decisão D-10)
 Supabase, região sa-east-1
   ├─ Postgres 17 com RLS: cadastros, premissas versionadas, cenários, ocorrências, auditoria
-  ├─ Auth com Google Workspace, restrito ao domínio LeverPro
+  ├─ Auth com conta Microsoft (Entra ID), restrito ao tenant LeverPro (decisão D-13)
   ├─ Vault: credenciais de calendário
   └─ Fila solver_jobs
 Worker CP-SAT (Python e OR-Tools), a partir da E15
@@ -213,7 +213,7 @@ flowchart LR
 - [x] Supabase criado, `supabase init` e `supabase link`
 - [x] Vercel: projeto criado, `vercel link`, variáveis públicas nos três ambientes, `vercel.json` com região gru1
 - [x] `CLAUDE.md` com fontes de verdade e convenções
-- [ ] Repositório GitHub privado e push (bloqueado, seção 9)
+- [x] Repositório GitHub privado `AlyGuimaraes/schedule-optimizer` e push por SSH
 - [ ] `vercel git connect` para deploy automático por push e preview por PR
 - [ ] GitHub Actions: lint, typecheck, testes e build em todo PR
 - [ ] Proteção da branch `main`, template de PR, Conventional Commits
@@ -361,7 +361,7 @@ flowchart LR
 - [x] Seed gerado por `scripts/gerar-seed.ts` (`pnpm seed:gerar`) a partir de `lib/dominio/semente.ts` com semente 7: 6 cargos, 20 pessoas, 4 times, 6 etapas, 13 itens de playbook, 95 clientes, 112 projetos, 940 produtos e 266 cadeiras
 - [x] O seed passa `montarSquad` em todos os projetos antes de gravar, o que corrige o defeito 15
 - [ ] Regravar os números de referência da seção 1.3 e o golden da paridade sobre a base com a regra do time aplicada
-- [ ] Auth com Google, restrito ao domínio LeverPro (hook `before-user-created` ou validação no callback); página `/entrar`; `proxy.ts` do Next 16 renovando a sessão com `@supabase/ssr` e protegendo o grupo `(app)`
+- [ ] Auth com conta Microsoft (provedor Azure do Supabase, app registration no Entra ID), restrito ao tenant LeverPro; página `/entrar`; `proxy.ts` do Next 16 renovando a sessão com `@supabase/ssr` e protegendo o grupo `(app)`. Como a agenda está no Outlook (D-10), o mesmo tenant serve ao login e ao Graph (D-13)
 - [x] RLS em todas as tabelas: leitura para autenticados, escrita para gestor e admin via `tem_papel()`, playbook e cargos só para admin, auditoria somente leitura, `agente_execucoes` e `solver_jobs` sem política (só service role)
 - [x] Perfil de usuário criado automaticamente no primeiro acesso, por trigger em `auth.users`
 - [x] Script `pnpm db:tipos` com `supabase gen types typescript --linked`, gerando `lib/dados/tipos-banco.ts`
@@ -478,7 +478,8 @@ flowchart LR
 **Objetivo.** Trocar a "Agenda atual" simulada pela agenda real e produzir os indicadores sobre ela (entrega da Fase 1 do roadmap e critério 1 do §13).
 **Requisitos.** §8, §11 Fase 1, critério 1.
 
-- [ ] Provedor principal conforme a decisão D-10; recomendação: Google Workspace com delegação de domínio por service account (uma autorização do admin cobre as 20 agendas), escopo somente leitura nesta etapa; Microsoft Graph (`Calendars.Read`) como alternativa
+- [ ] Outlook via Microsoft Graph (decisão D-10, 11/09/2026): app registration no Entra ID com permissão de aplicação `Calendars.Read` e consentimento do admin do tenant, o que cobre as 20 agendas com uma autorização só; leitura por `/users/{id}/calendarView` na janela importada
+- [ ] Opcional: restringir o acesso do app às caixas do time com uma application access policy do Exchange, para não ler agendas de fora da operação
 - [ ] Credenciais no Supabase Vault; tabela `integracoes_calendario`
 - [ ] Importador de N semanas: normaliza em slots de 30 minutos e classifica cada evento como cerimônia de projeto reconhecida (título, participantes e cliente), bloqueio opaco ou institucional
 - [ ] Tela de conciliação para eventos não reconhecidos, com sugestão da IA a partir da E19
@@ -589,10 +590,10 @@ flowchart LR
 **Objetivo.** Publicar o plano aprovado nas agendas e reconciliar mudanças externas (critério 6).
 **Requisitos.** §8, §10, §12.
 
-- [ ] Escopo de escrita (Google `calendar.events` ou Graph `Calendars.ReadWrite`) no mesmo modelo de autorização da E09
-- [ ] Publicação escreve as ocorrências com antecedência mínima de 48h, identificador próprio (Google `extendedProperties.private.cadenciaOcorrenciaId`, Graph `singleValueExtendedProperties`), participantes como convidados e justificativa na descrição
+- [ ] Escopo de escrita `Calendars.ReadWrite` (permissão de aplicação no mesmo app registration da E09)
+- [ ] Publicação escreve as ocorrências no Outlook com antecedência mínima de 48h, identificador próprio em `singleValueExtendedProperties` (`cadenciaOcorrenciaId`), participantes como convidados e justificativa no corpo do evento; o organizador é a caixa de um responsável definido por cerimônia ou uma caixa de serviço
 - [ ] Modo sombra (§12): por time, o Cadência só mostra o diff ou escreve num calendário "Cadência (sombra)" antes de escrever nas agendas reais
-- [ ] Reconciliação por webhook (Google watch, Graph subscriptions) e varredura periódica: alteração externa numa ocorrência gera proposta de realocação, nunca sobrescrita silenciosa; cancelamento externo reabre a demanda; eventos criados fora viram bloqueios opacos
+- [ ] Reconciliação por change notifications do Graph (subscriptions em `/users/{id}/events`, renovadas antes de expirar, com cron de renovação) e varredura periódica por delta query: alteração externa numa ocorrência gera proposta de realocação, nunca sobrescrita silenciosa; cancelamento externo reabre a demanda; eventos criados fora viram bloqueios opacos
 - [ ] Idempotência por ocorrência e controle de versão por etag
 
 **Critérios de aceite.** Publicar uma semana escreve os eventos certos; mover um evento no calendário gera proposta em menos de 5 minutos.
@@ -776,21 +777,18 @@ Regra: segue-se o protótipo, que é o artefato mais recente, salvo decisão con
 | D-07 | Como garantir 100% de SLA com o orçamento mensal: SLA pode usar tolerância no teto mensal, reservar orçamento para cerimônias críticas ou depender do CP-SAT | nova | E12, critério 5 |
 | D-08 | APIs disponíveis dos módulos LeverPro (Tarefas, Projetos, RH) e do Levi | nova | E19, E23 |
 | D-09 | Leitura de "zerar violações de teto" no critério 4: nenhuma alocação acima do limite aceitável e do teto absoluto, com concessões dentro da tolerância permitidas | nova | E17 |
-| D-10 | Provedor de calendário principal e modelo de autorização (delegação de domínio × OAuth individual) | nova | E09, E16 |
+| D-10 | ✅ **Decidido em 11/09/2026: Outlook (Microsoft 365) via Microsoft Graph**, com permissão de aplicação e consentimento do admin do tenant | nova | E09, E16 |
 | D-11 | Hospedagem do worker CP-SAT | nova | E15 |
 | D-12 | Papéis de acesso: quem é gestor, quem só lê, se líderes editam só os próprios projetos | nova | E03 |
+| D-13 | Provedor de login. Recomendação: conta Microsoft (Entra ID), já que a agenda está no Outlook e o mesmo tenant atende login e Graph | consequência da D-10 | E03 |
 
 ## 9. Pendências de setup
 
-1. **GitHub.** O `gh` está autenticado como AlyGuimaraes com um token de acesso pessoal que não pode criar repositórios. Duas saídas: rodar `gh auth login` com o escopo `repo` (ou gerar um token com permissão de administração de repositórios), ou criar `AlyGuimaraes/schedule-optimizer` como privado em github.com/new. Depois:
-   ```bash
-   git remote add origin git@github.com:AlyGuimaraes/schedule-optimizer.git && git push -u origin main
-   ```
-   e `pnpm dlx vercel@latest git connect` para ligar os deploys automáticos.
+1. **GitHub.** ✅ Resolvido em 11/09/2026: o repositório foi criado pelo navegador e o código sobe por SSH. Os tokens de acesso pessoal testados não tinham `administration=write` e devem ser revogados, porque circularam em texto.
 2. **Supabase.** Confirmar a cobrança do novo projeto na organização Leverpro; habilitar PITR no go-live. Duas observações de operação: a chave secreta no formato novo (`sb_secret_`) vem **mascarada** pela CLI e só pode ser copiada do painel, então o `.env.local` usa a `service_role` legada; e a migração `20260911000004_dados_demonstracao.sql` carrega a base simulada, que deve ser retirada quando entrarem os dados reais.
 3. **Vercel.** A região gru1 exige plano Pro no time; confirmar no primeiro deploy.
 4. **Anthropic.** Chave de API da LeverPro antes da E18.
-5. **Google Workspace.** Admin para a delegação de domínio antes da E09.
+5. **Microsoft 365.** Um admin do tenant precisa criar o app registration no Entra ID (ou autorizar que seja criado), com `Calendars.Read` para a E09, `Calendars.ReadWrite` para a E16 e o redirect de login do Supabase para a E03, e dar o consentimento de administrador. Três valores saem dali: tenant ID, client ID e client secret.
 
 ## 10. Riscos de execução
 
