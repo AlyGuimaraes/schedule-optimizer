@@ -1,15 +1,24 @@
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import type { Metadata } from "next"
+import { Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'})
+const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
+// Geist Mono só nos números, com tabular-nums
+const fontMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
+
+export const metadata: Metadata = {
+  title: {
+    default: "Cadência · Gestão e Otimização de Agendas · LeverPro",
+    template: "%s · Cadência",
+  },
+  description:
+    "Gestão e otimização de agendas da operação de implantação LeverPro.",
+}
 
 export default function RootLayout({
   children,
@@ -18,12 +27,20 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="pt-BR"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
+      className={cn(
+        "antialiased",
+        fontSans.variable,
+        fontMono.variable,
+        "font-sans"
+      )}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        {/* tema claro é o padrão (§14.1); o escuro é preferência do usuário */}
+        <ThemeProvider defaultTheme="light" enableSystem={false}>
+          <TooltipProvider delay={120}>{children}</TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
