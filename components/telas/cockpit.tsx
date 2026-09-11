@@ -133,7 +133,8 @@ function Cockpit({ mundo, config, simulacao: sim, cenario }: Contexto) {
                     const int = Math.min(h / Math.max(lim, 1), 1)
                     const fundo =
                       h === 0 ? "var(--muted)" : `color-mix(in oklab, var(--primary) ${Math.round(12 + int * 78)}%, var(--card))`
-                    const cor = int > 0.5 ? "var(--primary-foreground)" : "var(--ink-2)"
+                    // texto escuro na escala toda: o claro sobre o azul da marca não chega a 4,5:1 (D-14)
+                    const cor = "var(--foreground)"
                     return (
                       <div
                         key={d}

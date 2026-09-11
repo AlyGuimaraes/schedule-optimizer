@@ -15,7 +15,8 @@
     "seed:gerar": "tsx scripts/gerar-seed.ts",
     "solver:comparar": "tsx --conditions=react-server scripts/solver-comparar.ts",
     "db:tipos": "supabase gen types typescript --linked > lib/dados/tipos-banco.ts",
-    "db:verificar": "tsx --env-file=.env.local scripts/verificar-banco.ts"
+    "db:verificar": "tsx --env-file=.env.local scripts/verificar-banco.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -40,6 +41,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

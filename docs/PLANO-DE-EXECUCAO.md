@@ -147,11 +147,11 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | ID | Etapa | Fase (§11) | Depende de | Dias de dev | Status |
 |---|---|---|---|---|---|
 | E00 | Setup do projeto e infraestrutura | 1 Fundação | | 1 | 🟡 falta ligar a Vercel ao GitHub |
-| E01 | Design system Cadência | 1 Fundação | E00 | 5 | 🟡 CSS e primitivas prontos, falta a vitrine |
+| E01 | Design system Cadência | 1 Fundação | E00 | 5 | 🟡 vitrine pronta; falta a comparação visual com o protótipo e o ajuste das variantes de Button e Badge |
 | E02 | Motor de domínio em TypeScript | 1 Fundação | E00 | 5 | 🟡 porte e paridade prontos |
 | E03 | Banco de dados, autenticação e RLS | 1 Fundação | E02 (tipos) | 4 | 🟡 esquema, RLS e seed no ar |
 | E04 | Camada de dados e estado da aplicação | 1 Fundação | E02, E03 | 3 | 🟡 mundo do banco no motor |
-| E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | 🟡 falta E2E |
+| E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | ✅ |
 | E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ✅ |
 | E07 | Tela Premissas (Gerais, Por cargo, Urgência, Playbook) | 1 Fundação | E01, E04 | 5 | 🟡 governança depende do login |
 | E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | ✅ |
@@ -274,9 +274,9 @@ flowchart LR
 - [x] `lib/cores.ts`: hues padrão das fases (kickoff 300, discovery 245, construção 145, homologação 35, go-live 170, sustentação 95), `HUE_CER` (L1566), hash de texto para hues novos, helper `estiloHue(h)` que devolve `{ "--fh": h }`
 - [x] Classes utilitárias `.chip-hue` para fundo, texto e borda em `oklch(var(--cor-chip-*) var(--fh))`
 - [ ] Variantes do `Button` e do `Badge` ajustadas às medidas do protótipo, sem quebrar os componentes shadcn que dependem delas
-- [ ] Vitrine `/design`, visível só em desenvolvimento e preview, com cada primitiva nos dois temas e dados fictícios estáticos
+- [x] Vitrine `/design`, visível só em desenvolvimento e preview, com cada primitiva nos dois temas e dados fictícios estáticos
 - [ ] Script Playwright que abre o protótipo, captura os mesmos componentes e compara com a vitrine
-- [ ] axe na vitrine; `aria-pressed`, `aria-selected`, `aria-current` e `aria-label` em botões de ícone
+- [x] axe na vitrine, nos dois temas, dentro do E2E (`e2e/acessibilidade.spec.ts`); `aria-pressed`, `aria-selected`, `aria-current` e `aria-label` em botões de ícone
 - [x] Corrigir no porte as cores inexistentes do protótipo (`var(--warn)`, `var(--accent)` como texto) e a fonte "Geist" dos gráficos (seção 6)
 
 **Critérios de aceite.** Vitrine completa; axe sem violações sérias; diferença visual de até 1% por componente contra o protótipo em 1440px, nos dois temas.
@@ -397,7 +397,7 @@ flowchart LR
 
 **Critérios de aceite.** Editar uma premissa reflete nos números em menos de 500ms; recarregar a página preserva tudo; uma segunda sessão vê a mudança depois da revalidação.
 
-#### E05 · Tela Projetos · 🟡
+#### E05 · Tela Projetos · ✅
 
 **Objetivo.** Replicar a tela Projetos do protótipo (L2254) com CRUD persistido.
 **Requisitos.** R03, R04, R18, R20, R33, R34, R51, §7.4.
@@ -411,7 +411,7 @@ flowchart LR
 - [x] Trocar a fase recompõe os cargos do squad; trocar o time zera o squad
 - [x] **Corrigir o defeito 1 da seção 6**: o time selecionado no modal precisa aparecer e ser salvo
 - [x] Confirmação de exclusão com a consequência (produtos e etapa)
-- [ ] Testes E2E: criar, editar com troca de fase e de time, excluir
+- [x] Testes E2E: criar, editar com troca de fase e de time, excluir (`e2e/projetos-crud.spec.ts`, com limpeza no final). A suíte `pnpm e2e` tem 25 testes: navegação, fluxos de leitura, axe e este cadastro; roda com o Chrome da máquina, e no CI depende dos segredos do Supabase
 
 **Critérios de aceite.** Números iguais ao motor; o squad respeita o time (§2.0); os fluxos passam no E2E.
 
@@ -619,7 +619,7 @@ flowchart LR
 **Objetivo.** Fechar os sete critérios do §13 com evidência e colocar em uso real.
 
 - [ ] Checklist da seção 5 com evidência por critério (teste automatizado ou roteiro assinado)
-- [ ] Acessibilidade do §14.7: axe rodado nas sete telas no tema claro e corrigido (dica flutuante com `aria-describedby` e abertura por foco, `dl` do Indicador, regiões roláveis focáveis, `muted-foreground` a 4,5:1). Pendente: contraste da cor primária com texto (D-14), auditoria do tema escuro e alvos de 44px nos controles primários
+- [ ] Acessibilidade do §14.7: axe (WCAG 2.1 AA) roda no E2E sobre as sete telas e a vitrine, que inclui o tema escuro, sem violação séria. Corrigidos: dica flutuante com `aria-describedby` e abertura por foco, `dl` do Indicador, regiões roláveis focáveis, `muted-foreground` a 4,5:1, tokens `-ink` para texto de sucesso, aviso e erro, texto escuro no mapa de calor. Pendente: contraste da cor primária com texto (D-14) e alvos de 44px nos controles primários
 - [ ] Estados do §14.8: esqueleto por tela, vazios com explicação, erros inline no rodapé do editor
 - [ ] Desempenho: LCP abaixo de 2,5s, edição de célula abaixo de 100ms, orçamento de bundle por rota
 - [ ] Segurança: CSP com nonce por requisição (`proxy.ts`) e cabeçalhos fixos (`next.config.ts`), limite de 90 server actions por minuto por IP, segredos só no servidor (service role e chave da API em módulos `server-only`), logs sem dado pessoal. Pendente: RLS efetiva, que depende do login (E03), e a revisão de segurança final
