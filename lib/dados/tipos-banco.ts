@@ -555,41 +555,108 @@ export type Database = {
       }
       eventos_externos: {
         Row: {
+          cerimonia_tipo: string | null
+          classificacao: string
           criado_em: string
           external_id: string
           fim: string
           id: string
+          importacao_id: string | null
           inicio: string
           opaco: boolean
+          participantes: number
           pessoa_id: string
+          projeto_id: string | null
           provedor: Database["public"]["Enums"]["provedor_calendario"]
           titulo_hash: string | null
         }
         Insert: {
+          cerimonia_tipo?: string | null
+          classificacao?: string
           criado_em?: string
           external_id: string
           fim: string
           id?: string
+          importacao_id?: string | null
           inicio: string
           opaco?: boolean
+          participantes?: number
           pessoa_id: string
+          projeto_id?: string | null
           provedor: Database["public"]["Enums"]["provedor_calendario"]
           titulo_hash?: string | null
         }
         Update: {
+          cerimonia_tipo?: string | null
+          classificacao?: string
           criado_em?: string
           external_id?: string
           fim?: string
           id?: string
+          importacao_id?: string | null
           inicio?: string
           opaco?: boolean
+          participantes?: number
           pessoa_id?: string
+          projeto_id?: string | null
           provedor?: Database["public"]["Enums"]["provedor_calendario"]
           titulo_hash?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "eventos_externos_importacao_id_fkey"
+            columns: ["importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacoes_agenda"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "eventos_externos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_externos_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importacoes_agenda: {
+        Row: {
+          criado_em: string
+          eventos: number
+          id: string
+          janela_fim: string
+          janela_inicio: string
+          pessoa_id: string
+          provedor: Database["public"]["Enums"]["provedor_calendario"]
+        }
+        Insert: {
+          criado_em?: string
+          eventos?: number
+          id?: string
+          janela_fim: string
+          janela_inicio: string
+          pessoa_id: string
+          provedor: Database["public"]["Enums"]["provedor_calendario"]
+        }
+        Update: {
+          criado_em?: string
+          eventos?: number
+          id?: string
+          janela_fim?: string
+          janela_inicio?: string
+          pessoa_id?: string
+          provedor?: Database["public"]["Enums"]["provedor_calendario"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacoes_agenda_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "pessoas"
@@ -1581,6 +1648,7 @@ export type Database = {
         Args: { p_destino: string; p_etapa: string }
         Returns: undefined
       }
+      resumo_importacoes: { Args: never; Returns: Json }
       salvar_squads: { Args: { p_cadeiras: Json }; Returns: undefined }
       tem_papel: {
         Args: { minimo: Database["public"]["Enums"]["papel_app"] }
@@ -1594,7 +1662,7 @@ export type Database = {
       papel_app: "admin" | "gestor" | "leitor"
       perfil_otimizacao: "foco" | "equilibrio" | "cliente" | "estabilidade"
       prioridade_cliente: "alta" | "media" | "baixa"
-      provedor_calendario: "google" | "microsoft"
+      provedor_calendario: "google" | "microsoft" | "ics"
       status_cenario: "rascunho" | "simulado" | "publicado" | "arquivado"
       status_ocorrencia:
         | "planejada"
@@ -1744,7 +1812,7 @@ export const Constants = {
       papel_app: ["admin", "gestor", "leitor"],
       perfil_otimizacao: ["foco", "equilibrio", "cliente", "estabilidade"],
       prioridade_cliente: ["alta", "media", "baixa"],
-      provedor_calendario: ["google", "microsoft"],
+      provedor_calendario: ["google", "microsoft", "ics"],
       status_cenario: ["rascunho", "simulado", "publicado", "arquivado"],
       status_ocorrencia: [
         "planejada",

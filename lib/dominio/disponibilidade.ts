@@ -1,5 +1,5 @@
 import { DIAS, GERAL_PADRAO, SLOTS_DIA } from "./padroes"
-import type { Cerimonia, Ocupacao, PremissasGerais } from "./tipos"
+import type { Bloqueio, Cerimonia, Ocupacao, PremissasGerais } from "./tipos"
 
 export function novaOcupacao(nPessoas: number): Ocupacao {
   const o: Ocupacao = []
@@ -49,6 +49,23 @@ export function livre(
     }
   }
   return true
+}
+
+/** Marca de compromisso da agenda importada na ocupação (E09): não é cerimônia, mas ocupa o slot. */
+export const BLOQUEADO = -2
+
+/** Leva à ocupação os compromissos de fora de uma semana. Sem bloqueios, nada muda. */
+export function marcarBloqueios(oc: Ocupacao, bloqueios?: Record<number, Bloqueio[]>): void {
+  if (!bloqueios) return
+  Object.entries(bloqueios).forEach(([p, lista]) => {
+    const linha = oc[Number(p)]
+    if (!linha) return
+    lista.forEach((b) => {
+      const dia = linha[b.dia]
+      if (!dia) return
+      for (let t = Math.max(0, b.inicio); t < Math.min(SLOTS_DIA, b.fim); t++) dia[t] = BLOQUEADO
+    })
+  })
 }
 
 export function marcar(oc: Ocupacao, ev: Cerimonia, d: number, s: number): void {

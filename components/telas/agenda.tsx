@@ -86,6 +86,8 @@ function Agenda(ctx: Contexto) {
   const proj = projetosSel.length === 1 ? mundo.projetos[projetosSel[0]] : null
   const p = umaPessoa ?? mundo.pessoas[0]
   const prem = premDe(config, p.papel)
+  // compromissos importados (E09) só com uma pessoa selecionada, como as ausências
+  const bloqueiosSemana = umaPessoa ? (cal?.bloqueios?.[semanaIdx + 1]?.[umaPessoa.id] ?? []) : []
 
   const visiveis = (lista: Cerimonia[]) =>
     lista.filter(
@@ -298,6 +300,16 @@ function Agenda(ctx: Contexto) {
                 (umaPessoa && cal?.indisponivel?.[semanaIdx + 1]?.[umaPessoa.id]?.[d]) ? (
                   <div className="zona z-fora" style={{ top: 0, height: 20 * ALT }} />
                 ) : null}
+                {/* agenda importada (E09): compromissos de fora da pessoa selecionada */}
+                {bloqueiosSemana
+                  .filter((b) => b.dia === d)
+                  .map((b, i) => (
+                    <div
+                      key={`bl${i}`}
+                      className="zona z-fora"
+                      style={{ top: b.inicio * ALT, height: (b.fim - b.inicio) * ALT }}
+                    />
+                  ))}
                 {G.diaProtegido === "sexta-tarde" && d === 4 ? (
                   <div
                     className="zona z-fora"
@@ -350,6 +362,12 @@ function Agenda(ctx: Contexto) {
             <span className="tag-neutra">
               <i className="z-foco" />
               janela protegida {n1(prem.focoProt / 2)}h
+            </span>
+          ) : null}
+          {bloqueiosSemana.length ? (
+            <span className="tag-neutra">
+              <i className="z-fora" />
+              compromisso da agenda importada
             </span>
           ) : null}
           <span className="tag-neutra">

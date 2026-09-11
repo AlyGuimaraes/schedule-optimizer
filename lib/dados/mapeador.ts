@@ -1,6 +1,7 @@
 import {
   dataDoDia,
   limiteCongelamento,
+  pedacosNosDias,
   posicaoNoHorizonte,
   proximaSegunda,
   semanaAbsoluta,
@@ -124,6 +125,25 @@ export interface PlanoBanco {
   ausencias?: AusenciaBanco[]
   /** início real de cada série (defeito 8) */
   series?: { projeto_id: string; playbook_item_id: string; inicio: string }[]
+  /** compromissos da agenda importada que não são cerimônia reconhecida (E09) */
+  bloqueios?: BloqueioBanco[]
+}
+
+/** Como a importação classifica cada evento da agenda (E09). */
+export type ClassificacaoEvento = "cerimonia" | "institucional" | "opaco"
+
+export const ROTULO_CLASSIFICACAO: Record<ClassificacaoEvento, string> = {
+  cerimonia: "cerimônia reconhecida",
+  institucional: "compromisso institucional",
+  opaco: "compromisso da agenda",
+}
+
+/** Evento externo como `carregar_plano()` devolve: só início, fim e classificação. */
+export interface BloqueioBanco {
+  pessoa_id: string
+  inicio: string
+  fim: string
+  classificacao: ClassificacaoEvento
 }
 
 export type TipoAusencia = "ferias" | "ausencia" | "feriado_nacional" | "feriado_municipal"
@@ -195,6 +215,28 @@ function montarCalendario(dados: DadosMundo, plano: PlanoBanco, agoraMs: number)
     }
   })
 
+  // agenda importada (E09): cada compromisso vira blocos em slots nos dias úteis do horizonte,
+  // presos à grade do motor. Cerimônia reconhecida não bloqueia: quem a planeja é o otimizador.
+  const bloqueios: NonNullable<Calendario["bloqueios"]> = {}
+  ;(plano.bloqueios ?? []).forEach((b) => {
+    if (b.classificacao === "cerimonia") return
+    const p = pessoa.get(b.pessoa_id)
+    const ini = Date.parse(b.inicio)
+    const fim = Date.parse(b.fim)
+    if (p === undefined || Number.isNaN(ini) || Number.isNaN(fim)) return
+    pedacosNosDias(ini, fim).forEach((x) => {
+      const pos = posicaoNoHorizonte(inicio, x.data)
+      if (!pos || pos.semana > SEMANAS_CALENDARIO) return
+      const semana = (bloqueios[pos.semana] ??= {})
+      ;(semana[p] ??= []).push({
+        dia: pos.dia,
+        inicio: x.inicio,
+        fim: x.fim,
+        motivo: ROTULO_CLASSIFICACAO[b.classificacao] ?? ROTULO_CLASSIFICACAO.opaco,
+      })
+    })
+  })
+
   const congeladoAte = limiteCongelamento(inicio, agoraMs)
   return {
     inicio,
@@ -203,6 +245,7 @@ function montarCalendario(dados: DadosMundo, plano: PlanoBanco, agoraMs: number)
     ...(congeladoAte > 0 ? { congeladoAte } : {}),
     ...(Object.keys(indisponivel).length ? { indisponivel } : {}),
     ...(Object.keys(feriados).length ? { feriados } : {}),
+    ...(Object.keys(bloqueios).length ? { bloqueios } : {}),
   }
 }
 

@@ -190,6 +190,22 @@ export interface Calendario {
   indisponivel?: Record<number, Record<number, Record<number, string>>>
   /** feriados: semana do horizonte → dia → nome */
   feriados?: Record<number, Record<number, string>>
+  /**
+   * Compromissos da agenda importada (E09) que não são cerimônia de projeto reconhecida:
+   * semana do horizonte → pessoa → blocos em slots, com `fim` exclusivo. Ninguém é convocado por
+   * cima nem colado neles (intervalo obrigatório), e o tempo bloqueado não conta como foco livre.
+   */
+  bloqueios?: Record<number, Record<number, Bloqueio[]>>
+}
+
+/** Bloco ocupado por um compromisso de fora do Cadência (§8), num dia útil da semana. */
+export interface Bloqueio {
+  dia: number
+  /** primeiro slot ocupado */
+  inicio: number
+  /** slot em que o bloco termina (exclusivo) */
+  fim: number
+  motivo: string
 }
 
 export interface TrocaCadeira {

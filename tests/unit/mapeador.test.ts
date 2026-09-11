@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { mapearMundo, type MundoBanco } from "@/lib/dados/mapeador"
+import { aplicarPlano, mapearMundo, type MundoBanco, type PlanoBanco } from "@/lib/dados/mapeador"
 import {
   CLIENTES_PADRAO,
   ETAPAS_PADRAO,
@@ -184,5 +184,50 @@ describe("números de referência da base com a regra do time (§2.0)", () => {
         ev.participantes.forEach((p) => expect(time.membros).toContain(p))
       })
     )
+  })
+})
+
+describe("agenda importada no calendário do motor (E09)", () => {
+  const dados = mapearMundo(comoOBancoDevolve(mundoDaBase()))
+  // sexta, 11/09/2026 às 13h em São Paulo: o horizonte começa na segunda, 14/09
+  const agora = Date.UTC(2026, 8, 11, 16)
+  const vazio: PlanoBanco = { publicado: null, ancoras: [], ocorrencias: [] }
+  const plano: PlanoBanco = {
+    ...vazio,
+    bloqueios: [
+      // terça 15/09, 10:00 às 11:30 em São Paulo
+      { pessoa_id: "pessoa-3", inicio: "2026-09-15T13:00:00.000Z", fim: "2026-09-15T14:30:00.000Z", classificacao: "opaco" },
+      // sexta 25/09 inteira
+      { pessoa_id: "pessoa-3", inicio: "2026-09-25T03:00:00.000Z", fim: "2026-09-26T03:00:00.000Z", classificacao: "institucional" },
+      // cerimônia reconhecida não bloqueia: quem planeja é o otimizador
+      { pessoa_id: "pessoa-4", inicio: "2026-09-16T13:00:00.000Z", fim: "2026-09-16T14:00:00.000Z", classificacao: "cerimonia" },
+      // sábado, semana passada, depois do trimestre e pessoa desconhecida ficam de fora
+      { pessoa_id: "pessoa-3", inicio: "2026-09-19T13:00:00.000Z", fim: "2026-09-19T14:00:00.000Z", classificacao: "opaco" },
+      { pessoa_id: "pessoa-3", inicio: "2026-09-10T13:00:00.000Z", fim: "2026-09-10T14:00:00.000Z", classificacao: "opaco" },
+      { pessoa_id: "pessoa-3", inicio: "2026-12-15T13:00:00.000Z", fim: "2026-12-15T14:00:00.000Z", classificacao: "opaco" },
+      { pessoa_id: "pessoa-99", inicio: "2026-09-15T13:00:00.000Z", fim: "2026-09-15T14:00:00.000Z", classificacao: "opaco" },
+    ],
+  }
+
+  it("leva os compromissos para semana, dia e slots do horizonte", () => {
+    const cal = aplicarPlano(dados, plano, agora).config.calendario
+    expect(cal?.inicio).toBe("2026-09-14")
+    expect(cal?.bloqueios).toEqual({
+      1: { 3: [{ dia: 1, inicio: 4, fim: 7, motivo: "compromisso da agenda" }] },
+      2: { 3: [{ dia: 4, inicio: 0, fim: 20, motivo: "compromisso institucional" }] },
+    })
+  })
+
+  it("sem eventos importados, o calendário não ganha a chave", () => {
+    expect(aplicarPlano(dados, vazio, agora).config.calendario?.bloqueios).toBeUndefined()
+    expect(aplicarPlano(dados, { ...vazio, bloqueios: [] }, agora).config.calendario?.bloqueios).toBeUndefined()
+  })
+
+  it("o motor respeita o que veio do banco", () => {
+    const { config } = aplicarPlano(dados, plano, agora)
+    const w = simular(dados.mundo, { ...config, horizonte: 1 }).semanas[0]
+    w.otm.alocadas
+      .filter((ev) => ev.participantes.includes(3) && ev.dia === 1)
+      .forEach((ev) => expect((ev.slot ?? 0) + ev.slots + 1 <= 4 || (ev.slot ?? 0) - 1 >= 7).toBe(true))
   })
 })
