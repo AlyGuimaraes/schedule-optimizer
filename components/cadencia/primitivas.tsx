@@ -31,15 +31,16 @@ export function Indicador({
   contexto?: ReactNode
   delta?: Delta
 }) {
-  let rodape = <div className="var">{contexto ?? " "}</div>
+  // o rodapé também é um dd do mesmo termo: dentro de <dl> só cabem dt e dd (axe, definition-list)
+  let rodape = <dd className="var">{contexto ?? " "}</dd>
   if (v) {
     const igual = Math.abs(v.d) < 0.05
     const seta = igual ? "=" : v.d > 0 ? "▲" : "▼"
     rodape = (
-      <div className={cn("var", !igual && (v.bom ? "sobe" : "desce"))}>
+      <dd className={cn("var", !igual && (v.bom ? "sobe" : "desce"))}>
         {seta} {n1(Math.abs(v.d))}
         {v.suf} vs. atual
-      </div>
+      </dd>
     )
   }
   return (

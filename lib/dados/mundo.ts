@@ -2,6 +2,8 @@ import "server-only"
 
 import { cache } from "react"
 
+import { registrar } from "@/lib/log"
+
 import { clienteAdmin } from "./admin"
 import { aplicarPlano, mapearMundo, type DadosMundo, type MundoBanco, type PlanoBanco } from "./mapeador"
 
@@ -20,12 +22,12 @@ export const carregarMundo = cache(async (): Promise<ResultadoCarga> => {
     if (mundo.error) throw new Error(mundo.error.message)
     let dados = mapearMundo(mundo.data as unknown as MundoBanco)
     // sem o plano o app funciona igual, só sem estabilidade e âncoras
-    if (plano.error) console.error("[cadência] plano vigente indisponível:", plano.error.message)
+    if (plano.error) registrar("aviso", "plano_indisponivel", { erro: plano.error.message })
     else if (plano.data) dados = aplicarPlano(dados, plano.data as unknown as PlanoBanco)
     return { dados, erro: null }
   } catch (e) {
     const mensagem = e instanceof Error ? e.message : String(e)
-    console.error("[cadência] falha ao carregar o mundo:", mensagem)
+    registrar("erro", "mundo_carga_falhou", { erro: mensagem })
     return { dados: null, erro: mensagem }
   }
 })

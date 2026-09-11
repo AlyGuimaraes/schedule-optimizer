@@ -12,6 +12,7 @@ import {
 } from "@/lib/dominio"
 import { proximaSegunda } from "@/lib/dominio/calendario"
 import { iniciaisDe } from "@/lib/formato"
+import { registrar } from "@/lib/log"
 
 import { clienteAdmin } from "./admin"
 import { remontarSquads } from "./squads-servidor"
@@ -50,7 +51,7 @@ async function executar<T>(
     return { ok: true, dados }
   } catch (e) {
     const erro = e instanceof Error ? e.message : String(e)
-    console.error("[cadência] gravação falhou:", erro)
+    registrar("erro", "gravacao_falhou", { erro })
     return { ok: false, erro: traduzirErro(erro) }
   }
 }

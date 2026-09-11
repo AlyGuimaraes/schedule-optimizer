@@ -229,7 +229,7 @@ function Indicadores(ctx: Contexto) {
             titulo="Custo por cliente"
             apoio={`R$ ${brl(custos.total)} no mês, ${custos.porCliente.length} clientes`}
           />
-          <div className="rolagem" style={{ maxHeight: 380 }}>
+          <div className="rolagem" style={{ maxHeight: 380 }} tabIndex={0} role="region" aria-label="Custo por cliente">
             <table>
               <thead>
                 <tr>

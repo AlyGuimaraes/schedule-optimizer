@@ -163,7 +163,7 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E14 | Premissas avançadas e modificadores automáticos | 2 Otimizador | E07, E12 | 4 | ✅ |
 | E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | 🟡 worker local pronto; deploy, fila e ligação no app dependem da D-11 |
 | E16 | Escrita nos calendários e reconciliação | 2 Otimizador | E09, E13 | 8 | ⬜ |
-| E17 | **Marco MVP**: aceite, hardening e go-live | 2 Otimizador | E05 a E16 | 5 | ⬜ |
+| E17 | **Marco MVP**: aceite, hardening e go-live | 2 Otimizador | E05 a E16 | 5 | 🟡 segurança, acessibilidade e observabilidade iniciadas; aceite e go-live dependem do login e das integrações |
 | E18 | Fundação da camada de IA | 3 IA | E04 | 3 | 🟡 pronta sem a chave; evals, cache e lotes dependem dela |
 | E19 | Classificador, Planejador de Cadência, Compositor de Squad | 3 IA | E18, E14 | 5 | ⬜ |
 | E20 | Narrador, Orquestrador, Sentinela | 3 IA | E18, E13, E16 | 6 | 🟡 Narrador ligado com fallback; Orquestrador e Sentinela pendentes |
@@ -619,11 +619,11 @@ flowchart LR
 **Objetivo.** Fechar os sete critérios do §13 com evidência e colocar em uso real.
 
 - [ ] Checklist da seção 5 com evidência por critério (teste automatizado ou roteiro assinado)
-- [ ] Acessibilidade do §14.7: axe em todas as telas, teclado completo, foco visível, contraste de 4,5:1 nos dois temas, alvos de 30px nos controles densos e 44px nos primários
+- [ ] Acessibilidade do §14.7: axe rodado nas sete telas no tema claro e corrigido (dica flutuante com `aria-describedby` e abertura por foco, `dl` do Indicador, regiões roláveis focáveis, `muted-foreground` a 4,5:1). Pendente: contraste da cor primária com texto (D-14), auditoria do tema escuro e alvos de 44px nos controles primários
 - [ ] Estados do §14.8: esqueleto por tela, vazios com explicação, erros inline no rodapé do editor
 - [ ] Desempenho: LCP abaixo de 2,5s, edição de célula abaixo de 100ms, orçamento de bundle por rota
-- [ ] Segurança: revisão de segurança, RLS revisada, segredos só no servidor, CSP, limite de taxa nas actions, logs sem dado pessoal
-- [ ] Observabilidade: Vercel Analytics e Speed Insights, logs estruturados, alerta em falha do cron e do worker
+- [ ] Segurança: CSP com nonce por requisição (`proxy.ts`) e cabeçalhos fixos (`next.config.ts`), limite de 90 server actions por minuto por IP, segredos só no servidor (service role e chave da API em módulos `server-only`), logs sem dado pessoal. Pendente: RLS efetiva, que depende do login (E03), e a revisão de segurança final
+- [ ] Observabilidade: Vercel Analytics e Speed Insights no layout, logs estruturados em JSON (`lib/log.ts`). Pendente: alerta em falha do cron e do worker, que ainda não rodam em produção
 - [ ] Backups e PITR no Supabase
 - [ ] Piloto em modo sombra com um squad por duas semanas, depois ativação por time
 - [ ] Treinamento e guia de uso
@@ -797,6 +797,7 @@ Regra: segue-se o protótipo, que é o artefato mais recente, salvo decisão con
 | D-11 | Hospedagem do worker CP-SAT | nova | E15 |
 | D-12 | Papéis de acesso: quem é gestor, quem só lê, se líderes editam só os próprios projetos | nova | E03 |
 | D-13 | Provedor de login. Recomendação: conta Microsoft (Entra ID), já que a agenda está no Outlook e o mesmo tenant atende login e Graph | consequência da D-10 | E03 |
+| D-14 | Contraste da cor primária: `#0084d1` com texto claro dá 3,77:1, abaixo dos 4,5:1 do §14.7, no botão Otimizar e nos números em azul pequenos. Opções: escurecer o primary para cerca de `#0073b8` (4,8:1) ou manter a cor da marca e usar o azul só em texto grande e preenchimentos | nova, da auditoria axe | E01, E17 |
 
 ## 9. Pendências de setup
 

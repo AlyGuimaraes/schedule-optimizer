@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { instanteSlot, justificativa, proximaSegunda, simular, validarPlano, type PerfilId } from "@/lib/dominio"
+import { registrar } from "@/lib/log"
 
 import { clienteAdmin } from "./admin"
 import { aplicarPlano, mapearMundo, type MundoBanco, type PlanoBanco } from "./mapeador"
@@ -204,7 +205,7 @@ export async function salvarCenario(e: {
 
     return { ok: true, dados: id }
   } catch (e) {
-    console.error("[cadência] salvar cenário falhou:", erroDe(e))
+    registrar("erro", "cenario_salvar_falhou", { erro: erroDe(e) })
     return { ok: false, erro: erroDe(e) }
   }
 }

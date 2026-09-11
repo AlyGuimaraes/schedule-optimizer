@@ -522,7 +522,7 @@ function Agenda(ctx: Contexto) {
           </tbody>
         </table>
         <SecCab titulo="Projetos" apoio={`${projs.length} alocações`} style={{ marginTop: 20 }} />
-        <div className="rolagem" style={{ maxHeight: 230 }}>
+        <div className="rolagem" style={{ maxHeight: 230 }} tabIndex={0} role="region" aria-label="Projetos da pessoa">
           <table>
             <tbody>
               {projs.map((x) => (
@@ -710,7 +710,7 @@ function PainelAgregado({
       </table>
 
       <SecCab titulo="Carga por pessoa" apoio="semana, contra o teto do cargo" style={{ marginTop: 20 }} />
-      <div className="rolagem" style={{ maxHeight: 250 }}>
+      <div className="rolagem" style={{ maxHeight: 250 }} tabIndex={0} role="region" aria-label="Carga por pessoa">
         <table>
           <tbody>
             {horasPessoa.map((x) => {

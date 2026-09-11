@@ -127,7 +127,7 @@
   .ind { display: flex; flex-direction: column; padding: 13px 15px 14px; background: var(--card);
     border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--sombra-xs); margin: 0; }
   .ind dt { font-size: 11.5px; font-weight: 500; color: var(--muted-foreground); }
-  .ind dd { font-family: var(--mono); font-size: 25px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.1;
+  .ind dd:not(.var) { font-family: var(--mono); font-size: 25px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.1;
     margin: 7px 0 0; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 3px;
     transition: color var(--t) var(--ease); }
   .ind dd small { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--muted-foreground); }
