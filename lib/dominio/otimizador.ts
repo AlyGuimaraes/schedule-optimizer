@@ -1,5 +1,5 @@
 import { posicaoNaSemana } from "./calendario"
-import { almoco, livre, marcar, novaOcupacao } from "./disponibilidade"
+import { almoco, livre, marcar, marcarBloqueios, novaOcupacao } from "./disponibilidade"
 import { DIAS, GERAL_PADRAO, PERFIS } from "./padroes"
 import { geralDe, premDe } from "./premissas"
 import { membrosDoTime } from "./times"
@@ -94,6 +94,10 @@ export function otimizar(
   const teto = (p: number) => PP[p].teto * disp[p]
   // antecedência de 48h (§2.2): nas primeiras posições da semana 1 nada novo entra nem sai do lugar
   const congelado = semanaIdx === 1 ? (cfg.calendario?.congeladoAte ?? 0) : 0
+  // agenda importada (E09): os compromissos de fora ocupam a grade antes de tudo. Assim `livre`
+  // recusa a sobreposição e o intervalo obrigatório, e `custoDia` não conta esse tempo como foco.
+  // Sem bloqueios, a ocupação nasce vazia como no protótipo.
+  marcarBloqueios(oc, cfg.calendario?.bloqueios?.[semanaIdx])
 
   // nível 0 = premissa alvo; nível 1 = o máximo que o perfil autoriza ceder
   const tetoEf = (p: number, r: boolean) =>

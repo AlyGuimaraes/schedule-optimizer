@@ -161,6 +161,34 @@ export function validarPlano(
       })
     )
 
+  // Agenda importada (E09, §8): ninguém é convocado por cima de um compromisso de fora nem colado
+  // nele, com o mesmo intervalo obrigatório que vale entre cerimônias (R5)
+  const bloq = cfg.calendario?.bloqueios?.[semanaIdx]
+  if (bloq)
+    resultado.alocadas.forEach((ev) => {
+      const d = ev.dia as number
+      const s = ev.slot as number
+      ev.participantes.forEach((p) => {
+        const doDia = (bloq[p] ?? []).filter((b) => b.dia === d)
+        if (!doDia.length) return
+        const em = (t: number) => doDia.find((b) => t >= b.inicio && t < b.fim)
+        let sobre: (typeof doDia)[number] | undefined
+        for (let t = s; t < s + ev.slots && !sobre; t++) sobre = em(t)
+        if (sobre) {
+          v.push({ regra: "§8", descricao: `sobre um compromisso da agenda importada (${sobre.motivo})`, pessoa: nome(p), cerimonia: ev.tipo })
+          return
+        }
+        for (let i = 1; i <= G.buffer; i++) {
+          const a = s - i
+          const z = s + ev.slots + i - 1
+          if ((a >= G.inicio && !almoco(G, a) && em(a)) || (z < G.fim && !almoco(G, z) && em(z))) {
+            v.push({ regra: "R5", descricao: "sem o intervalo obrigatório junto de um compromisso importado", pessoa: nome(p), cerimonia: ev.tipo })
+            return
+          }
+        }
+      })
+    })
+
   // Antecedência de 48h (§2.2): na janela congelada só fica o que já estava no plano vigente
   const congelado = semanaIdx === 1 ? (cfg.calendario?.congeladoAte ?? 0) : 0
   if (congelado > 0)

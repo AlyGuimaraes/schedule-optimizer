@@ -7,6 +7,7 @@ import type { Config } from "./tipos"
 
 const DIA_MS = 86_400_000
 const FUSO_MS = 3 * 3600_000
+const SLOT_MS = 30 * 60_000
 /** Segunda-feira de referência para numerar as semanas absolutas. */
 const EPOCA = Date.UTC(2024, 0, 1)
 
@@ -47,6 +48,43 @@ export function posicaoNoHorizonte(inicio: string, data: string): { semana: numb
 /** Instante real (ms) de um slot do motor. O slot 0 é 08:00 em São Paulo. */
 export function instanteSlot(inicio: string, semana: number, dia: number, slot: number): number {
   return meiaNoiteUTC(inicio) + FUSO_MS + ((semana - 1) * 7 + dia) * DIA_MS + (8 * 60 + slot * 30) * 60_000
+}
+
+/** Instante real (ms) de um slot numa data local (AAAA-MM-DD). O slot 0 é 08:00 em São Paulo. */
+export function instanteNaData(data: string, slot: number): number {
+  return meiaNoiteUTC(data) + FUSO_MS + (8 * 60 + slot * 30) * 60_000
+}
+
+/** Pedaço de um intervalo real num dia útil, na grade do motor (`fim` exclusivo). */
+export interface PedacoDoDia {
+  data: string
+  inicio: number
+  fim: number
+}
+
+/**
+ * Recorta um intervalo real [inicioMs, fimMs) em pedaços por dia útil, na grade de 30 minutos do
+ * motor (E09). O início desce e o fim sobe para a meia hora, e cada pedaço fica preso à janela de
+ * trabalho `[janela.inicio, janela.fim)`. Fim de semana e o que cai fora da janela somem.
+ */
+export function pedacosNosDias(
+  inicioMs: number,
+  fimMs: number,
+  janela: { inicio: number; fim: number } = { inicio: 0, fim: SLOTS_DIA }
+): PedacoDoDia[] {
+  const pedacos: PedacoDoDia[] = []
+  if (!(fimMs > inicioMs)) return pedacos
+  const ultimo = meiaNoiteUTC(dataLocal(fimMs - 1))
+  for (let t = meiaNoiteUTC(dataLocal(inicioMs)); t <= ultimo; t += DIA_MS) {
+    const semana = new Date(t).getUTCDay()
+    if (semana === 0 || semana === 6) continue
+    const data = iso(t)
+    const base = instanteNaData(data, 0)
+    const inicio = Math.max(janela.inicio, Math.floor((inicioMs - base) / SLOT_MS))
+    const fim = Math.min(janela.fim, Math.ceil((fimMs - base) / SLOT_MS))
+    if (fim > inicio) pedacos.push({ data, inicio, fim })
+  }
+  return pedacos
 }
 
 /** Posição de um slot na semana, na ordem do tempo: dia × SLOTS_DIA + slot. */

@@ -38,10 +38,11 @@ import { useCadencia } from "@/lib/estado/cadencia"
 import { useParametro } from "@/lib/estado/url"
 import { n0, n1, pc, primeiro } from "@/lib/formato"
 
+import { AbaAgendas } from "./agendas"
 import { AbaAusencias } from "./ausencias"
 import { fatorMes, papeisDe, pessoaHora, pessoasDo, resultadoDe, situacaoPessoa } from "./comum"
 
-const ABAS = ["pessoas", "times", "cargos", "ausencias"] as const
+const ABAS = ["pessoas", "times", "cargos", "ausencias", "agendas"] as const
 type AbaTime = (typeof ABAS)[number]
 
 export function TelaTime() {
@@ -57,6 +58,7 @@ function Time(ctx: Contexto) {
     { id: "times" as const, rotulo: "Times", apoio: `${mundo.times.length} squads` },
     { id: "cargos" as const, rotulo: "Cargos", apoio: `${papeisDe(config).length} cadastrados` },
     { id: "ausencias" as const, rotulo: "Ausências", apoio: "férias e feriados" },
+    { id: "agendas" as const, rotulo: "Agendas", apoio: "importadas por .ics" },
   ]
   return (
     <>
@@ -68,8 +70,10 @@ function Time(ctx: Contexto) {
           <AbaTimes ctx={ctx} />
         ) : aba === "cargos" ? (
           <AbaCargos ctx={ctx} />
-        ) : (
+        ) : aba === "ausencias" ? (
           <AbaAusencias ctx={ctx} />
+        ) : (
+          <AbaAgendas ctx={ctx} />
         )}
       </div>
     </>
