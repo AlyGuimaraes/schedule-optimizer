@@ -154,7 +154,7 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | 🟡 falta E2E |
 | E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ✅ |
 | E07 | Tela Premissas (Gerais, Por cargo, Urgência, Playbook) | 1 Fundação | E01, E04 | 5 | 🟡 governança depende do login |
-| E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | 🟡 custo por cargo pendente |
+| E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | ✅ |
 | E09 | Importação da agenda atual | 1 Fundação | E03, E04 | 6 | ⬜ |
 | E10 | Tela Cockpit | 2 Otimizador | E01, E04 | 3 | ✅ |
 | E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | 🟡 seleção inicial depende do login |
@@ -164,13 +164,13 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | ⬜ |
 | E16 | Escrita nos calendários e reconciliação | 2 Otimizador | E09, E13 | 8 | ⬜ |
 | E17 | **Marco MVP**: aceite, hardening e go-live | 2 Otimizador | E05 a E16 | 5 | ⬜ |
-| E18 | Fundação da camada de IA | 3 IA | E04 | 3 | ⬜ |
+| E18 | Fundação da camada de IA | 3 IA | E04 | 3 | 🟡 pronta sem a chave; evals, cache e lotes dependem dela |
 | E19 | Classificador, Planejador de Cadência, Compositor de Squad | 3 IA | E18, E14 | 5 | ⬜ |
-| E20 | Narrador, Orquestrador, Sentinela | 3 IA | E18, E13, E16 | 6 | ⬜ |
+| E20 | Narrador, Orquestrador, Sentinela | 3 IA | E18, E13, E16 | 6 | 🟡 Narrador ligado com fallback; Orquestrador e Sentinela pendentes |
 | E21 | Planejamento semanal automatizado | 3 IA | E19, E20 | 3 | ⬜ |
 | E22 | Simulação de contratação e déficit | 4 Inteligência | E13 | 4 | ⬜ |
 | E23 | Integrações Tarefas, Projetos e RH | 4 Inteligência | E03, decisão D-08 | 6 | ⬜ |
-| E24 | Custo por cliente e benchmark por produto | 4 Inteligência | E08 | 4 | ⬜ |
+| E24 | Custo por cliente e benchmark por produto | 4 Inteligência | E08 | 4 | 🟡 complexidade do produto depende da E23 |
 | E25 | Matriz de competências (condicional) | 4 Inteligência | decisão D-02 | 8 | ⬜ |
 
 Total estimado: 123 dias de dev (Fase 1: 39, Fase 2: 45, Fase 3: 17, Fase 4: 22). O roadmap da especificação prevê 20 semanas; com duas trilhas em paralelo o prazo fecha com folga de cerca de 30%.
@@ -470,13 +470,13 @@ flowchart LR
 
 **Critérios de aceite.** Recorrência de Construção de 4 para 2 semanas leva a demanda da S1 de 58 para 64 (teste); colunas calculadas batem com a seção 1.3; edição reflete na hora em todas as telas.
 
-#### E08 · Tela Indicadores e relatório mensal · 🟡
+#### E08 · Tela Indicadores e relatório mensal · ✅
 
 **Objetivo.** Replicar Indicadores (L2805) e entregar o relatório mensal do critério 7.
 **Requisitos.** R14, R25, R57, §6, §7.7, critério 7 do §13.
 
 - [x] Faixa: Reuniões no mês (delta), Pessoa-hora no mês (delta), Reuniões por pessoa, Horas por pessoa, Tempo produtivo médio (tom e delta em p.p.), Custo de cerimônia em R$ mil
-- [ ] Custo: o protótipo usa R$ 118 por hora-pessoa fixo; em produção, Σ horas × `custo_hora` do cargo (§6)
+- [x] Custo: o protótipo usa R$ 118 por hora-pessoa fixo; em produção, Σ horas × `custo_hora` do cargo (§6). Editável em Premissas › Por cargo, com R$ 118 como padrão; entra também no relatório mensal (`custo_mes_rs`)
 - [x] Gráficos Cerimônias por semana e Pessoa-hora por semana (`chart-2`)
 - [x] **Quadro de pessoal**: nota; Cargo, Pessoas, Teto por pessoa, Capacidade, Demanda (teórica do playbook, incluindo sem quórum), Sem quórum, Ocupação, Saldo em FTE, Situação nas cinco faixas, Recomendação em número de pessoas; ordenado por saldo
 - [x] **Capacidade por time**: Time, Pessoas, Projetos, Capacidade, Carga, Ocupação, Cargos ausentes, Leitura
@@ -631,20 +631,20 @@ flowchart LR
 
 ### Fase 3 · Camada de IA
 
-#### E18 · Fundação da camada de IA · ⬜
+#### E18 · Fundação da camada de IA · 🟡
 
 **Objetivo.** Infraestrutura comum aos seis agentes do §4.5, com a regra de que a IA nunca decide horário.
 **Requisitos.** R10, §4.5.
 
-- [ ] SDK oficial `@anthropic-ai/sdk` em `lib/ia/cliente.ts`, só no servidor; `ANTHROPIC_API_KEY` como variável sensível na Vercel
-- [ ] Modelo `claude-opus-5` em todos os agentes; custo e profundidade ajustados por agente com `output_config.effort` (baixo para classificação em lote, mais alto para narrativa e orquestração); pensamento adaptativo, que é o padrão do modelo
-- [ ] Saída estruturada com schemas Zod via `client.messages.parse` (`output_config.format`); contratos versionados em `lib/ia/contratos/`
-- [ ] Fallback do lado do servidor habilitado e tratamento de `stop_reason: "refusal"` antes de ler o conteúdo
-- [ ] Prompt caching do prefixo estável (glossário, playbook, premissas vigentes), com o conteúdo variável depois do último breakpoint; monitorar `cache_read_input_tokens`
-- [ ] Streaming para respostas longas (Narrador); Batches API para o processamento semanal em lote (Classificador sobre 112 projetos, metade do custo)
-- [ ] Registro de toda chamada em `agente_execucoes` (entrada, saída, modelo, tokens, custo, duração, versão do prompt)
-- [ ] Guardrail estrutural: nenhum schema de saída tem campo de horário; toda proposta passa pelo motor ou solver e por aprovação humana
-- [ ] Conjunto de avaliação por agente (casos reais anonimizados, critério de nota, custo medido) antes de ativar em produção
+- [x] SDK oficial `@anthropic-ai/sdk` em `lib/ia/cliente.ts`, só no servidor; sem `ANTHROPIC_API_KEY` o app segue com o texto determinístico e não faz chamada. Falta cadastrar a chave como variável sensível na Vercel
+- [x] Modelo `claude-opus-5` em todos os agentes; custo e profundidade ajustados por agente com `output_config.effort` (baixo para classificação em lote, mais alto para narrativa e orquestração); pensamento adaptativo
+- [x] Saída estruturada com schemas Zod (`output_config.format`) e contratos versionados em `lib/ia/contratos/`. Usa `messages.create` e valida depois de conferir o `stop_reason`, porque `messages.parse` leria o conteúdo antes da checagem de recusa
+- [x] Fallback do lado do servidor habilitado e tratamento de `stop_reason: "refusal"` antes de ler o conteúdo; confirmar com a chave que o cabeçalho beta do fallback está liberado na conta
+- [x] Prompt caching do prefixo estável (glossário, playbook, premissas vigentes), com o conteúdo variável depois do último breakpoint; a leitura de cache em `agente_execucoes` só se confirma com a chave
+- [ ] Streaming para respostas longas (Narrador, pede um route handler); Batches API para o processamento semanal em lote (Classificador sobre 112 projetos). Dependem da chave
+- [x] Registro de toda chamada em `agente_execucoes` (entrada, saída, modelo, tokens, custo, duração, versão do prompt)
+- [x] Guardrail estrutural: nenhum schema de saída tem campo de horário (teste sobre o Zod e o JSON Schema enviado); toda proposta passa pelo motor ou solver e por aprovação humana
+- [ ] Conjunto de avaliação por agente (casos reais anonimizados, critério de nota, custo medido) antes de ativar em produção. Depende da chave
 
 **Critérios de aceite.** Cliente com erros tipados e retries; custo por execução medido; avaliações executáveis.
 
@@ -659,7 +659,7 @@ flowchart LR
 
 #### E20 · Narrador, Orquestrador e Sentinela · ⬜
 
-- [ ] **Narrador**: substitui a leitura determinística do Otimizador; entrada solução, indicadores, concessões e déficit; saída resumo executivo e alertas em streaming; o texto determinístico fica como fallback
+- [x] **Narrador**: substitui a leitura determinística do Otimizador; entrada solução, indicadores, concessões e déficit; saída resumo executivo e alertas; o texto determinístico fica como fallback e aparece primeiro. Streaming depende da chave e de um route handler
 - [ ] **Orquestrador**: comando em linguagem natural ("proteger as manhãs dos especialistas em outubro") vira proposta de pesos, premissas ou perfil; tool runner com ferramentas `ler_premissas`, `ler_cenario`, `simular_alteracao` (roda o motor TS e devolve indicadores) e `propor_alteracao` (grava rascunho, não aplica); interface de comando com diff e botão aplicar
 - [ ] **Sentinela**: compara realizado (calendários) com planejado, detecta desvio e propõe reotimização com diff
 
@@ -689,8 +689,8 @@ flowchart LR
 
 #### E24 · Custo por cliente e benchmark por produto · ⬜
 
-- [ ] Custo de cerimônia por projeto e por cliente (Σ horas × custo-hora do cargo)
-- [ ] Benchmark de horas por tipo e complexidade de produto
+- [x] Custo de cerimônia por projeto e por cliente (Σ horas × custo-hora do cargo), em Indicadores e no relatório mensal
+- [ ] Benchmark de horas por tipo e complexidade de produto: pronto por volume de produtos (`analisarCustos`); a complexidade entra com o Módulo de Projetos (E23)
 
 #### E25 · Matriz de competências (condicional) · ⬜
 
