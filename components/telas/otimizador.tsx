@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { ComDados, type Contexto } from "@/components/cadencia/com-dados"
 import {
@@ -15,10 +15,16 @@ import {
   Terminal,
   VazioTela,
 } from "@/components/cadencia/primitivas"
+import { TextoLeitura } from "@/components/cadencia/texto-leitura"
 import { PERFIS, premDe, type PerfilId } from "@/lib/dominio"
 import { useCadencia } from "@/lib/estado/cadencia"
 import { useParametro } from "@/lib/estado/url"
 import { n0, n1, pc } from "@/lib/formato"
+import { narrarResultado } from "@/lib/ia/acoes"
+import type { AlertaNarrador, Narracao } from "@/lib/ia/contratos/narrador"
+import type { EntradaNarrador } from "@/lib/ia/entradas"
+import { leituraDeterministica } from "@/lib/ia/leitura-deterministica"
+import { contextoDaOperacao, resumirExecucao } from "@/lib/ia/resumo"
 
 import { AbaCenarios, SalvarCenario } from "./cenarios"
 import { papeisDe } from "./comum"
@@ -26,13 +32,14 @@ import { papeisDe } from "./comum"
 const ABAS = ["resultado", "concessoes", "trocas", "pendencias", "cenarios"] as const
 type AbaOtimizador = (typeof ABAS)[number]
 
-export function TelaOtimizador() {
-  return <ComDados>{(ctx) => <Otimizador {...ctx} />}</ComDados>
+/** `narradorIa` vem do servidor: com a chave de API configurada, a leitura passa pelo Narrador. */
+export function TelaOtimizador({ narradorIa = false }: { narradorIa?: boolean }) {
+  return <ComDados>{(ctx) => <Otimizador {...ctx} narradorIa={narradorIa} />}</ComDados>
 }
 
 // Porte de telaOtimizador() do protótipo (§7.3): seis indicadores, configuração e execução
 // em duas colunas, e as quatro tabelas de detalhe em abas.
-function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
+function Otimizador({ mundo, config, simulacao: sim, cenario, ms, narradorIa }: Contexto & { narradorIa: boolean }) {
   const [aba, setAba] = useParametro<AbaOtimizador>("aba", "resultado", ABAS)
   const setHorizonte = useCadencia((s) => s.setHorizonte)
   const setPerfil = useCadencia((s) => s.setPerfil)
@@ -78,12 +85,15 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
     .filter((x): x is NonNullable<typeof x> => x !== null)
 
   const fteObrig = quadro.reduce((s, x) => s + x.fteObrig, 0)
-  const porPremissa: Record<string, number> = {}
-  conc.forEach((c) => (porPremissa[c.premissa] = (porPremissa[c.premissa] || 0) + 1))
   const gargalo: Record<string, number> = {}
   adi.forEach((a) => a.papeis.forEach((pp) => (gargalo[pp] = (gargalo[pp] || 0) + 1)))
   const gargaloTop = Object.entries(gargalo).sort((a, c) => c[1] - a[1])[0]
   const coberturaBase = (100 * w.base.alocadas.length) / w.demanda.length
+
+  // Leitura do agente: a determinística aparece na hora; com IA, o Narrador troca o texto se responder
+  const resumo = resumirExecucao({ mundo, config, simulacao: sim, papeis })
+  const leitura = leituraDeterministica(resumo)
+  const narracao = useNarracao(narradorIa ? { resumo, contexto: contextoDaOperacao({ mundo, config, papeis }) } : null)
 
   const comparacao: [string, string, string, number, boolean][] = [
     ["Tempo produtivo médio", pc(b.produtivoMedio), pc(o.produtivoMedio), o.produtivoMedio - b.produtivoMedio, false],
@@ -253,34 +263,36 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
             )}
           </section>
           <section className="sec">
-            <SecCab titulo="Leitura do agente" apoio="Levi, narrador" />
-            <p className="leitura">
-              Com o perfil <b>{perfil.rotulo}</b>, o plano cobre <b>{pc(R.cobertura.total)}</b> da demanda do playbook (
-              {pc(R.cobertura.obrigatoria)} das obrigatórias) e mantém <b>{pc(o.aderencia)}</b> do time dentro do alvo do
-              próprio cargo.{" "}
-              {R.cobertura.relaxadas
-                ? `Para chegar lá, ${R.cobertura.relaxadas} cerimônia(s) foram alocadas com concessão: ${Object.entries(porPremissa)
-                    .map(([k2, v]) => `${v} de ${k2}`)
-                    .join(", ")}.`
-                : "Nenhuma premissa precisou ser cedida."}{" "}
-              {adi.length ? (
-                <>
-                  Sobraram <b>{adi.length} cerimônia(s)</b> fora do plano
-                  {fteObrig > 0 ? (
-                    <>
-                      , o equivalente a <b>{n1(fteObrig)} FTE</b>
-                      {gargaloTop ? ` em ${gargaloTop[0]}` : ""}
-                    </>
-                  ) : (
-                    ", todas opcionais"
-                  )}
-                  .
-                </>
-              ) : (
-                "Toda a demanda do playbook coube no plano."
-              )}{" "}
-              {trocas.length ? `A camada 2 resolveu ${trocas.length} caso(s) apenas trocando a cadeira.` : ""}
-            </p>
+            <SecCab
+              titulo="Leitura do agente"
+              apoio={
+                narracao ? (
+                  <>
+                    Levi, narrador <Selo tom="acento">IA</Selo>
+                  </>
+                ) : (
+                  "Levi, narrador"
+                )
+              }
+            />
+            {narracao ? (
+              <>
+                <p className="leitura">{narracao.resumo}</p>
+                {narracao.alertas.length ? (
+                  <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+                    {narracao.alertas.map((a, i) => (
+                      <p key={i} className="nota">
+                        <Selo tom={ALERTA[a.gravidade].tom}>{ALERTA[a.gravidade].rotulo}</Selo> <b>{a.titulo}.</b> {a.detalhe}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="leitura">
+                <TextoLeitura trechos={leitura} />
+              </p>
+            )}
           </section>
         </div>
       </div>
@@ -513,4 +525,38 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
       <SalvarCenario aberto={salvando} config={config} onFechar={() => setSalvando(false)} onSalvo={() => setAba("cenarios")} />
     </>
   )
+}
+
+const ALERTA = {
+  critico: { tom: "ruim", rotulo: "crítico" },
+  atencao: { tom: "aviso", rotulo: "atenção" },
+  info: { tom: "neutro", rotulo: "info" },
+} as const satisfies Record<AlertaNarrador["gravidade"], { tom: string; rotulo: string }>
+
+/**
+ * Narração da IA (E20) para o resultado exibido. Sem IA (`entrada` nula) não chama nada. Espera o
+ * motor assentar antes de chamar, ignora respostas de resultados antigos e, se a action falhar ou
+ * devolver null, a tela fica com a leitura determinística.
+ */
+function useNarracao(entrada: EntradaNarrador | null): Narracao | null {
+  const chave = entrada ? JSON.stringify(entrada) : null
+  const [ia, setIa] = useState<{ chave: string; narracao: Narracao } | null>(null)
+  useEffect(() => {
+    if (!chave) return
+    let vivo = true
+    const espera = setTimeout(() => {
+      narrarResultado(JSON.parse(chave) as EntradaNarrador)
+        .then((narracao) => {
+          if (vivo && narracao) setIa({ chave, narracao })
+        })
+        .catch(() => {
+          // falha de rede ou da action: fica a leitura determinística
+        })
+    }, 800)
+    return () => {
+      vivo = false
+      clearTimeout(espera)
+    }
+  }, [chave])
+  return ia && ia.chave === chave ? ia.narracao : null
 }
