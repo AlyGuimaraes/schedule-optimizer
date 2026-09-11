@@ -132,6 +132,14 @@ tests/unit, tests/paridade, tests/e2e
 docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 ```
 
+
+### 1.6 Decisões de implementação das telas (11/09/2026)
+
+- **CSS do protótipo portado** para `app/cadencia.css`, com as mesmas classes, escopado à área de conteúdo e aos modais. O menu e o cabeçalho continuam no shadcn. Isso garante as telas idênticas ao protótipo por construção, em vez de reescrever cada medida em utilitários.
+- **Gráficos em SVG próprio** (`components/cadencia/grafico-barras.tsx`), porte exato do `barras()` do protótipo, que já desenhava a anatomia do Recharts do shadcn. Sem dependência nova.
+- **Gravação pelo servidor**: server actions em `lib/dados/acoes.ts`; depois de mudanças estruturais, `remontarSquads` roda o `montarSquad` do domínio sobre o mundo do banco e grava só as cadeiras que mudaram; o layout revalida e o mundo volta do banco. Edições em linha (células) gravam sem revalidar, para a resposta do servidor não atropelar a digitação.
+- **Cliente derivado do nome** no editor de projeto ("Grupo Aurora A" pertence ao cliente "Grupo Aurora"), mantendo o formulário do protótipo; a prioridade grava no projeto e cria o cliente quando ele não existe (D-06).
+
 ---
 
 ## 2. Visão geral das etapas
@@ -139,18 +147,18 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | ID | Etapa | Fase (§11) | Depende de | Dias de dev | Status |
 |---|---|---|---|---|---|
 | E00 | Setup do projeto e infraestrutura | 1 Fundação | | 1 | 🟡 falta ligar a Vercel ao GitHub |
-| E01 | Design system Cadência | 1 Fundação | E00 | 5 | ⬜ |
+| E01 | Design system Cadência | 1 Fundação | E00 | 5 | 🟡 CSS e primitivas prontos, falta a vitrine |
 | E02 | Motor de domínio em TypeScript | 1 Fundação | E00 | 5 | 🟡 porte e paridade prontos |
 | E03 | Banco de dados, autenticação e RLS | 1 Fundação | E02 (tipos) | 4 | 🟡 esquema, RLS e seed no ar |
 | E04 | Camada de dados e estado da aplicação | 1 Fundação | E02, E03 | 3 | 🟡 mundo do banco no motor |
-| E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | ⬜ |
-| E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ⬜ |
-| E07 | Tela Premissas (Gerais, Por cargo, Urgência, Playbook) | 1 Fundação | E01, E04 | 5 | ⬜ |
-| E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | ⬜ |
+| E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | 🟡 falta E2E |
+| E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ✅ |
+| E07 | Tela Premissas (Gerais, Por cargo, Urgência, Playbook) | 1 Fundação | E01, E04 | 5 | 🟡 governança depende do login |
+| E08 | Tela Indicadores e relatório mensal | 1 Fundação | E01, E04 | 3 | 🟡 custo por cargo pendente |
 | E09 | Importação da agenda atual | 1 Fundação | E03, E04 | 6 | ⬜ |
-| E10 | Tela Cockpit | 2 Otimizador | E01, E04 | 3 | ⬜ |
-| E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | ⬜ |
-| E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | ⬜ |
+| E10 | Tela Cockpit | 2 Otimizador | E01, E04 | 3 | ✅ |
+| E11 | Tela Agenda | 2 Otimizador | E01, E04 | 5 | 🟡 detalhe da cerimônia na E13 |
+| E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | 🟡 execução persistida na E13 |
 | E13 | Cenários, publicação e estabilidade | 2 Otimizador | E12 | 5 | ⬜ |
 | E14 | Premissas avançadas e modificadores automáticos | 2 Otimizador | E07, E12 | 4 | ⬜ |
 | E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | ⬜ |
@@ -221,7 +229,7 @@ flowchart LR
 
 **Critérios de aceite.** Build verde; deploy de produção abre `/cockpit`; as sete rotas navegam; o tema alterna; o menu recolhe para 3rem com rótulo em tooltip.
 
-#### E01 · Design system Cadência · ⬜
+#### E01 · Design system Cadência · 🟡
 
 **Objetivo.** Todas as primitivas visuais do protótipo como componentes React tipados, idênticos em medida, cor e movimento, antes de qualquer dado real.
 **Requisitos.** R40, R41, R43, R44, R48, R51, R54, §14.
@@ -262,14 +270,14 @@ flowchart LR
 
 **Tarefas: utilitários e verificação**
 
-- [ ] `lib/formato.ts`: `hhmm(slot)`, `n1` e `n0` com vírgula decimal, `pc`, `primeiroNome`, `iniciais`, com testes
-- [ ] `lib/cores.ts`: hues padrão das fases (kickoff 300, discovery 245, construção 145, homologação 35, go-live 170, sustentação 95), `HUE_CER` (L1566), hash de texto para hues novos, helper `estiloHue(h)` que devolve `{ "--fh": h }`
-- [ ] Classes utilitárias `.chip-hue` para fundo, texto e borda em `oklch(var(--cor-chip-*) var(--fh))`
+- [x] `lib/formato.ts`: `hhmm(slot)`, `n1` e `n0` com vírgula decimal, `pc`, `primeiroNome`, `iniciais`, com testes
+- [x] `lib/cores.ts`: hues padrão das fases (kickoff 300, discovery 245, construção 145, homologação 35, go-live 170, sustentação 95), `HUE_CER` (L1566), hash de texto para hues novos, helper `estiloHue(h)` que devolve `{ "--fh": h }`
+- [x] Classes utilitárias `.chip-hue` para fundo, texto e borda em `oklch(var(--cor-chip-*) var(--fh))`
 - [ ] Variantes do `Button` e do `Badge` ajustadas às medidas do protótipo, sem quebrar os componentes shadcn que dependem delas
 - [ ] Vitrine `/design`, visível só em desenvolvimento e preview, com cada primitiva nos dois temas e dados fictícios estáticos
 - [ ] Script Playwright que abre o protótipo, captura os mesmos componentes e compara com a vitrine
 - [ ] axe na vitrine; `aria-pressed`, `aria-selected`, `aria-current` e `aria-label` em botões de ícone
-- [ ] Corrigir no porte as cores inexistentes do protótipo (`var(--warn)`, `var(--accent)` como texto) e a fonte "Geist" dos gráficos (seção 6)
+- [x] Corrigir no porte as cores inexistentes do protótipo (`var(--warn)`, `var(--accent)` como texto) e a fonte "Geist" dos gráficos (seção 6)
 
 **Critérios de aceite.** Vitrine completa; axe sem violações sérias; diferença visual de até 1% por componente contra o protótipo em 1440px, nos dois temas.
 
@@ -389,52 +397,52 @@ flowchart LR
 
 **Critérios de aceite.** Editar uma premissa reflete nos números em menos de 500ms; recarregar a página preserva tudo; uma segunda sessão vê a mudança depois da revalidação.
 
-#### E05 · Tela Projetos · ⬜
+#### E05 · Tela Projetos · 🟡
 
 **Objetivo.** Replicar a tela Projetos do protótipo (L2254) com CRUD persistido.
 **Requisitos.** R03, R04, R18, R20, R33, R34, R51, §7.4.
 
-- [ ] Seção **Horas de reunião por etapa**: Etapa (selo), Projetos, Urgência ("N de 5"), Prazo ("Nd"), Cerim./sem, h/semana, h/mês, h/mês por projeto, Participação nas horas (trilha e %). Pessoa-hora é duração × participantes; o mês é a soma do horizonte × 4,33 / H. A linha de apoio muda com o cenário
-- [ ] Seção **Projetos**: busca por cliente (170px), filtro por time com contagem, filtro por fase com contagem, botão Novo projeto
-- [ ] Aviso de squads incompletos quando houver
-- [ ] Tabela: Cliente e projeto (negrito, "falta X" em destructive), Fase, Time (clicável, filtra), Mês, Prioridade (acento para alta), Produtos ("R · D · I" e total), Squad (primeiros nomes com o cargo na dica), Cerim./sem, h/semana, h/mês, Health (ponto e texto), ações editar e excluir visíveis no hover e no foco
-- [ ] Vazio "Nenhum projeto encontrado" com orientação
-- [ ] Modal Novo/Editar projeto (760px): Cliente e projeto, Fase, Mês do projeto (1 a 48), Relatórios, Dashboards, Integrações, Health, Time responsável (com número de pessoas e dica), Prioridade do cliente (com peso e dica), bloco Squad com um seletor por cargo exigido pela fase ("automático" distribui pela menor carga) e erro quando não há ninguém do cargo; meta no cabeçalho com urgência e prazo da etapa
-- [ ] Trocar a fase recompõe os cargos do squad; trocar o time zera o squad
-- [ ] **Corrigir o defeito 1 da seção 6**: o time selecionado no modal precisa aparecer e ser salvo
-- [ ] Confirmação de exclusão com a consequência (produtos e etapa)
+- [x] Seção **Horas de reunião por etapa**: Etapa (selo), Projetos, Urgência ("N de 5"), Prazo ("Nd"), Cerim./sem, h/semana, h/mês, h/mês por projeto, Participação nas horas (trilha e %). Pessoa-hora é duração × participantes; o mês é a soma do horizonte × 4,33 / H. A linha de apoio muda com o cenário
+- [x] Seção **Projetos**: busca por cliente (170px), filtro por time com contagem, filtro por fase com contagem, botão Novo projeto
+- [x] Aviso de squads incompletos quando houver
+- [x] Tabela: Cliente e projeto (negrito, "falta X" em destructive), Fase, Time (clicável, filtra), Mês, Prioridade (acento para alta), Produtos ("R · D · I" e total), Squad (primeiros nomes com o cargo na dica), Cerim./sem, h/semana, h/mês, Health (ponto e texto), ações editar e excluir visíveis no hover e no foco
+- [x] Vazio "Nenhum projeto encontrado" com orientação
+- [x] Modal Novo/Editar projeto (760px): Cliente e projeto, Fase, Mês do projeto (1 a 48), Relatórios, Dashboards, Integrações, Health, Time responsável (com número de pessoas e dica), Prioridade do cliente (com peso e dica), bloco Squad com um seletor por cargo exigido pela fase ("automático" distribui pela menor carga) e erro quando não há ninguém do cargo; meta no cabeçalho com urgência e prazo da etapa
+- [x] Trocar a fase recompõe os cargos do squad; trocar o time zera o squad
+- [x] **Corrigir o defeito 1 da seção 6**: o time selecionado no modal precisa aparecer e ser salvo
+- [x] Confirmação de exclusão com a consequência (produtos e etapa)
 - [ ] Testes E2E: criar, editar com troca de fase e de time, excluir
 
 **Critérios de aceite.** Números iguais ao motor; o squad respeita o time (§2.0); os fluxos passam no E2E.
 
-#### E06 · Tela Time · ⬜
+#### E06 · Tela Time · ✅
 
 **Objetivo.** Replicar as três abas do Time (L2346) com as operações de manutenção.
 **Requisitos.** R02, R19, R20, R21, R47, R56, §2.0, §7.5.
 
-- [ ] Aba **Pessoas**: apoio "cada pessoa é medida contra o teto do próprio cargo", botões Redistribuir alocação e Nova pessoa; aviso de cargos sem ninguém alocável; tabela com Pessoa, Cargo, Cap. líq., Alvo, Teto, Projetos, Cerim., Horas, Ocupação do teto (trilha e %), Taxa, Folga, Foco, Frag., Reun./mês, h/mês (acima do máximo em destructive, acima de 90% em warning), Máx mês, Situação (acima do limite, concessão, no alvo apertado, folga, no alvo), ações
-- [ ] Modal pessoa (560px): Nome, Cargo com alvo e teto, dica sobre troca de cargo, alocação atual
-- [ ] Remoção de pessoa: confirmação com quantos projetos serão reatribuídos e se há substituto; reatribuição pela menor carga
-- [ ] Redistribuir alocação: confirmação sem estilo de perigo, executa `rebalancearAlocacao`, replaneja
-- [ ] Aba **Times**: nota explicativa; tabela Time, Pessoas, Composição por cargo (selos), Projetos, Cerim./sem, h/mês, Ocupação do time, Cobertura de cargos ("falta X" ou "cobre as etapas"), ações (excluir só com mais de um time)
-- [ ] Modal time (680px): nome, membros por cargo em slots alternáveis, aviso de cobertura em tempo real
-- [ ] Exclusão de time com destino obrigatório dos projetos e squads remontados. **Corrigir o defeito 2 da seção 6**
-- [ ] Aba **Cargos**: Cargo, Pessoas, Quem ocupa, Alvo, Teto/sem, Máx h/mês, Cerimônias do playbook, Carga média, Situação, ações renomear e excluir; nota com atalho para Premissas por cargo
-- [ ] Modal cargo (520px): nome; ao criar, "Copiar premissas de"
-- [ ] Excluir cargo bloqueado enquanto houver gente (mensagem na linha de estado); confirmação conta as cerimônias que ficam sem quórum e remove o cargo do playbook. **Corrigir o defeito 3**
+- [x] Aba **Pessoas**: apoio "cada pessoa é medida contra o teto do próprio cargo", botões Redistribuir alocação e Nova pessoa; aviso de cargos sem ninguém alocável; tabela com Pessoa, Cargo, Cap. líq., Alvo, Teto, Projetos, Cerim., Horas, Ocupação do teto (trilha e %), Taxa, Folga, Foco, Frag., Reun./mês, h/mês (acima do máximo em destructive, acima de 90% em warning), Máx mês, Situação (acima do limite, concessão, no alvo apertado, folga, no alvo), ações
+- [x] Modal pessoa (560px): Nome, Cargo com alvo e teto, dica sobre troca de cargo, alocação atual
+- [x] Remoção de pessoa: confirmação com quantos projetos serão reatribuídos e se há substituto; reatribuição pela menor carga
+- [x] Redistribuir alocação: confirmação sem estilo de perigo, executa `rebalancearAlocacao`, replaneja
+- [x] Aba **Times**: nota explicativa; tabela Time, Pessoas, Composição por cargo (selos), Projetos, Cerim./sem, h/mês, Ocupação do time, Cobertura de cargos ("falta X" ou "cobre as etapas"), ações (excluir só com mais de um time)
+- [x] Modal time (680px): nome, membros por cargo em slots alternáveis, aviso de cobertura em tempo real
+- [x] Exclusão de time com destino obrigatório dos projetos e squads remontados. **Corrigir o defeito 2 da seção 6**
+- [x] Aba **Cargos**: Cargo, Pessoas, Quem ocupa, Alvo, Teto/sem, Máx h/mês, Cerimônias do playbook, Carga média, Situação, ações renomear e excluir; nota com atalho para Premissas por cargo
+- [x] Modal cargo (520px): nome; ao criar, "Copiar premissas de"
+- [x] Excluir cargo bloqueado enquanto houver gente (mensagem na linha de estado); confirmação conta as cerimônias que ficam sem quórum e remove o cargo do playbook. **Corrigir o defeito 3**
 
 **Critérios de aceite.** Renomear propaga para pessoas, squads e playbook numa operação; excluir time funciona; E2E das três abas.
 
-#### E07 · Tela Premissas · ⬜
+#### E07 · Tela Premissas · 🟡
 
 **Objetivo.** Replicar as quatro abas de Premissas (L2528), a principal superfície de configuração.
 **Requisitos.** R05, R07, R08, R12, R13, R15, R16, R22, R27, R28, R29, R30, R35, R37, R38, R42, R48, R52, R58, §2, §3, §7.6.
 
-- [ ] Aba **Gerais**, painel Jornada e intervalos: início (08:00 a 12:00), fim (14:00 a 18:00), início do almoço (11:00 a 14:00), duração do almoço (0,5, 1 ou 1,5h), intervalo (sem, 30 ou 60 min), dia protegido (nenhum, sexta à tarde, sexta inteira), força da preferência (0 a 4, passo 0,5, valor em mono)
-- [ ] Aba Gerais, **Melhores horários para reunião**: horas marcadas, nota, `FaixaSlots` com 20 blocos (fora da jornada e almoço desabilitados), jornada útil descontado o almoço
-- [ ] Aba Gerais, premissas do §2.2 ausentes no protótipo, exibidas e persistidas: quórum mínimo (100%, somente leitura), antecedência de convocação (48h) e estabilidade (20%), efetivas a partir da E13
-- [ ] Aba **Por cargo**: botões Restaurar padrões e Cadastrar cargos; `ResumoPremissas` (Cargos, Pessoas, Capacidade líquida, Teto de reunião, Carga da semana, Ocupação do teto); tabela com layout fixo, largura mínima de 1320px, colgroup 196 + 12 × 88 + 4 × 88 + 132, cabeçalho em dois níveis (Capacidade, Alvo de tempo, Tetos de reunião, Duração e foco, Calculado pelo sistema), coluna Cargo fixa, 12 campos editáveis e 5 calculadas em tempo real (Cap. líquida, Teto com a marca "absoluto", Limite, Carga, Situação); duas notas; gráfico Demanda contra teto por cargo (620px)
-- [ ] Campos editáveis e limites:
+- [x] Aba **Gerais**, painel Jornada e intervalos: início (08:00 a 12:00), fim (14:00 a 18:00), início do almoço (11:00 a 14:00), duração do almoço (0,5, 1 ou 1,5h), intervalo (sem, 30 ou 60 min), dia protegido (nenhum, sexta à tarde, sexta inteira), força da preferência (0 a 4, passo 0,5, valor em mono)
+- [x] Aba Gerais, **Melhores horários para reunião**: horas marcadas, nota, `FaixaSlots` com 20 blocos (fora da jornada e almoço desabilitados), jornada útil descontado o almoço
+- [x] Aba Gerais, premissas do §2.2 ausentes no protótipo, exibidas e persistidas: quórum mínimo (100%, somente leitura), antecedência de convocação (48h) e estabilidade (20%), efetivas a partir da E13
+- [x] Aba **Por cargo**: botões Restaurar padrões e Cadastrar cargos; `ResumoPremissas` (Cargos, Pessoas, Capacidade líquida, Teto de reunião, Carga da semana, Ocupação do teto); tabela com layout fixo, largura mínima de 1320px, colgroup 196 + 12 × 88 + 4 × 88 + 132, cabeçalho em dois níveis (Capacidade, Alvo de tempo, Tetos de reunião, Duração e foco, Calculado pelo sistema), coluna Cargo fixa, 12 campos editáveis e 5 calculadas em tempo real (Cap. líquida, Teto com a marca "absoluto", Limite, Carga, Situação); duas notas; gráfico Demanda contra teto por cargo (620px)
+- [x] Campos editáveis e limites:
 
 | Campo | Unidade | Mín | Máx | Passo |
 |---|---|---|---|---|
@@ -451,29 +459,29 @@ flowchart LR
 | Bloco mínimo de foco | h | 1 | 4 | 0,5 |
 | Janela protegida | h | 0 | 4 | 0,5 |
 
-- [ ] Versionamento: edições agrupadas por sessão de 30s para não gerar uma versão por tecla
-- [ ] Restaurar padrões: separar o que restaura (no protótipo o botão da aba Por cargo também restaura Gerais, Urgência e Clientes, defeito 14)
-- [ ] Aba **Urgência**: tabela de etapas (selo, projetos, urgência editável 1 a 5, prazo editável 1 a 60, cerimônias, efeito no otimizador, editar, excluir); nota sobre SLA; botão Nova etapa; tabela Prioridade do cliente (projetos, peso editável 1 a 5, score da etapa mais urgente); caixa de exemplo kickoff × sustentação
-- [ ] Modal etapa (520px): nome, urgência, prazo, dica de SLA. Remoção com destino obrigatório e descarte do playbook da etapa
-- [ ] Aba **Playbook**: botões Restaurar padrão e Nova cerimônia; nota; tabela (mínimo 1120px) com Etapa (selo, urgência e prazo na primeira linha do grupo), Projetos, Cerimônia, Cargos obrigatórios (abre o editor), Duração (15 a 240, passo 15), Recorrência (semanal, a cada 2, 3, 4, 6, 8 ou 12 semanas), Prioridade (1 a 5), Tipo (obrigatória, opcional), Cerim./mês, Pessoa-hora/mês, Peso na agenda (trilha e %), excluir
-- [ ] Modal cerimônia (720px): nome, etapa (travada na edição), duração, recorrência, tipo, prioridade, cargos obrigatórios em slots com a dica "presente em N de M times"; valida nome e ao menos um cargo
-- [ ] Criar, editar ou excluir cerimônia remonta os squads
+- [x] Versionamento: edições agrupadas por sessão de 30s para não gerar uma versão por tecla
+- [x] Restaurar padrões: separar o que restaura (no protótipo o botão da aba Por cargo também restaura Gerais, Urgência e Clientes, defeito 14)
+- [x] Aba **Urgência**: tabela de etapas (selo, projetos, urgência editável 1 a 5, prazo editável 1 a 60, cerimônias, efeito no otimizador, editar, excluir); nota sobre SLA; botão Nova etapa; tabela Prioridade do cliente (projetos, peso editável 1 a 5, score da etapa mais urgente); caixa de exemplo kickoff × sustentação
+- [x] Modal etapa (520px): nome, urgência, prazo, dica de SLA. Remoção com destino obrigatório e descarte do playbook da etapa
+- [x] Aba **Playbook**: botões Restaurar padrão e Nova cerimônia; nota; tabela (mínimo 1120px) com Etapa (selo, urgência e prazo na primeira linha do grupo), Projetos, Cerimônia, Cargos obrigatórios (abre o editor), Duração (15 a 240, passo 15), Recorrência (semanal, a cada 2, 3, 4, 6, 8 ou 12 semanas), Prioridade (1 a 5), Tipo (obrigatória, opcional), Cerim./mês, Pessoa-hora/mês, Peso na agenda (trilha e %), excluir
+- [x] Modal cerimônia (720px): nome, etapa (travada na edição), duração, recorrência, tipo, prioridade, cargos obrigatórios em slots com a dica "presente em N de M times"; valida nome e ao menos um cargo
+- [x] Criar, editar ou excluir cerimônia remonta os squads
 - [ ] Governança do playbook conforme a decisão D-03 (por padrão, só admin edita, com autor registrado)
 
 **Critérios de aceite.** Recorrência de Construção de 4 para 2 semanas leva a demanda da S1 de 58 para 64 (teste); colunas calculadas batem com a seção 1.3; edição reflete na hora em todas as telas.
 
-#### E08 · Tela Indicadores e relatório mensal · ⬜
+#### E08 · Tela Indicadores e relatório mensal · 🟡
 
 **Objetivo.** Replicar Indicadores (L2805) e entregar o relatório mensal do critério 7.
 **Requisitos.** R14, R25, R57, §6, §7.7, critério 7 do §13.
 
-- [ ] Faixa: Reuniões no mês (delta), Pessoa-hora no mês (delta), Reuniões por pessoa, Horas por pessoa, Tempo produtivo médio (tom e delta em p.p.), Custo de cerimônia em R$ mil
+- [x] Faixa: Reuniões no mês (delta), Pessoa-hora no mês (delta), Reuniões por pessoa, Horas por pessoa, Tempo produtivo médio (tom e delta em p.p.), Custo de cerimônia em R$ mil
 - [ ] Custo: o protótipo usa R$ 118 por hora-pessoa fixo; em produção, Σ horas × `custo_hora` do cargo (§6)
-- [ ] Gráficos Cerimônias por semana e Pessoa-hora por semana (`chart-2`)
-- [ ] **Quadro de pessoal**: nota; Cargo, Pessoas, Teto por pessoa, Capacidade, Demanda (teórica do playbook, incluindo sem quórum), Sem quórum, Ocupação, Saldo em FTE, Situação nas cinco faixas, Recomendação em número de pessoas; ordenado por saldo
-- [ ] **Capacidade por time**: Time, Pessoas, Projetos, Capacidade, Carga, Ocupação, Cargos ausentes, Leitura
-- [ ] Taxa de reunião por cargo (barras com teto tracejado) e Consolidado mensal por cargo
-- [ ] Relatório mensal de reuniões e horas por pessoa, cargo, projeto e etapa: `/api/relatorios/mensal?mes=` em CSV e versão imprimível para PDF
+- [x] Gráficos Cerimônias por semana e Pessoa-hora por semana (`chart-2`)
+- [x] **Quadro de pessoal**: nota; Cargo, Pessoas, Teto por pessoa, Capacidade, Demanda (teórica do playbook, incluindo sem quórum), Sem quórum, Ocupação, Saldo em FTE, Situação nas cinco faixas, Recomendação em número de pessoas; ordenado por saldo
+- [x] **Capacidade por time**: Time, Pessoas, Projetos, Capacidade, Carga, Ocupação, Cargos ausentes, Leitura
+- [x] Taxa de reunião por cargo (barras com teto tracejado) e Consolidado mensal por cargo
+- [x] Relatório mensal de reuniões e horas por pessoa, cargo, projeto e etapa: `/api/relatorios/mensal?mes=` em CSV e versão imprimível para PDF
 
 **Critérios de aceite.** Números iguais ao motor; o export confere com a tela.
 
@@ -495,51 +503,51 @@ flowchart LR
 
 ### Fase 2 · Otimizador
 
-#### E10 · Tela Cockpit · ⬜
+#### E10 · Tela Cockpit · ✅
 
 **Objetivo.** Replicar o Cockpit (L1686).
 **Requisitos.** R14, R26, R43, R49, §7.1.
 
-- [ ] Faixa: Tempo produtivo (tom contra o alvo médio, delta em p.p., "alvo médio de X%"), Aderência ao alvo (bom a partir de 95%, ruim abaixo de 70%, "N de M pessoas"), Cobertura do playbook ("A de D cerimônias"), Reunião por pessoa em h/mês (delta, "N reuniões por mês"), Déficit de capacidade em FTE (só no otimizado, "falta gente em X" ou "a demanda cabe no time atual"; na agenda atual, "n/d" e "a agenda vigente não segue política"), Cerimônias adiadas
-- [ ] Mapa de calor pessoa × dia com intensidade relativa ao máximo diário do cargo e dica por célula
-- [ ] Ocupação do teto por cargo: tabela com trilha (escala de 35%), marcador do teto, ordenada por pressão; nota
-- [ ] Portfólio por fase (barras sem eixo Y, com valores) e Pessoa-hora por tipo de cerimônia (cor pelo hue do tipo)
-- [ ] Sem grupo de alertas (R26)
-- [ ] Esqueleto com a forma da tela durante o carregamento
+- [x] Faixa: Tempo produtivo (tom contra o alvo médio, delta em p.p., "alvo médio de X%"), Aderência ao alvo (bom a partir de 95%, ruim abaixo de 70%, "N de M pessoas"), Cobertura do playbook ("A de D cerimônias"), Reunião por pessoa em h/mês (delta, "N reuniões por mês"), Déficit de capacidade em FTE (só no otimizado, "falta gente em X" ou "a demanda cabe no time atual"; na agenda atual, "n/d" e "a agenda vigente não segue política"), Cerimônias adiadas
+- [x] Mapa de calor pessoa × dia com intensidade relativa ao máximo diário do cargo e dica por célula
+- [x] Ocupação do teto por cargo: tabela com trilha (escala de 35%), marcador do teto, ordenada por pressão; nota
+- [x] Portfólio por fase (barras sem eixo Y, com valores) e Pessoa-hora por tipo de cerimônia (cor pelo hue do tipo)
+- [x] Sem grupo de alertas (R26)
+- [x] Esqueleto com a forma da tela durante o carregamento
 
 **Critérios de aceite.** Números idênticos ao protótipo com a semente 7, nos dois cenários.
 
-#### E11 · Tela Agenda · ⬜
+#### E11 · Tela Agenda · 🟡
 
 **Objetivo.** Replicar a Agenda (L1839), o elemento principal, ocupando cerca de três quartos da largura.
 **Requisitos.** R31, R32, R44, R45, R50, §7.2.
 
-- [ ] Barra: Segmentado compacto Semana/Mês, pílulas Pessoas e Clientes, "limpar filtros", resumo "N cerimônias na semana, Xh"
+- [x] Barra: Segmentado compacto Semana/Mês, pílulas Pessoas e Clientes, "limpar filtros", resumo "N cerimônias na semana, Xh"
 - [ ] Seleção inicial: a pessoa do usuário logado, se vinculada; senão, todas (o protótipo abre com a primeira pessoa)
-- [ ] **Semana**: cabeçalho do dia com total de horas ou "livre" (em primary quando carregado); horas à esquerda em mono 9.5px; zonas fora da jornada, fora da faixa preferencial, janela protegida (só com uma pessoa e nenhum cliente), almoço e dia protegido; blocos com `top = slot × 31 + 1` e altura `slots × 31 − 3`; faixas lado a lado para simultâneas; tracejado com concessão; contorno quando a pessoa aparece no projeto selecionado; texto com tipo, hora e projeto (pessoa única) ou participantes; dica completa com SLA
-- [ ] Legenda com os tipos presentes na semana, divisor, janela protegida, com concessão, fora do horário preferencial
-- [ ] Vazio "Nenhuma cerimônia na semana" com o botão Ver o mês
-- [ ] Seletor de semana do horizonte (melhoria: o protótipo mostra só a S1, defeito 9)
-- [ ] **Mês**: uma linha por semana do horizonte com contagem e horas; células de 138px com até 6 cerimônias e "e mais N"; célula vazia tracejada; nota com o horizonte
-- [ ] Painel lateral em três modos: **agregado** (cerimônias, horas, pessoa-hora, pessoas e projetos envolvidos, com concessão, acima do teto; carga por pessoa com trilha; por tipo com tags), **projeto** (prioridade e peso, urgência, prazo, mês, produtos, horas por semana e mês, cerimônias no mês, health; squad com cadeira vaga) e **pessoa** (cargo, capacidade, alvo, teto, limite, horas, folga, máximos, duração, blocos de foco, fragmentação, reuniões e horas no mês; projetos clicáveis que filtram)
+- [x] **Semana**: cabeçalho do dia com total de horas ou "livre" (em primary quando carregado); horas à esquerda em mono 9.5px; zonas fora da jornada, fora da faixa preferencial, janela protegida (só com uma pessoa e nenhum cliente), almoço e dia protegido; blocos com `top = slot × 31 + 1` e altura `slots × 31 − 3`; faixas lado a lado para simultâneas; tracejado com concessão; contorno quando a pessoa aparece no projeto selecionado; texto com tipo, hora e projeto (pessoa única) ou participantes; dica completa com SLA
+- [x] Legenda com os tipos presentes na semana, divisor, janela protegida, com concessão, fora do horário preferencial
+- [x] Vazio "Nenhuma cerimônia na semana" com o botão Ver o mês
+- [x] Seletor de semana do horizonte (melhoria: o protótipo mostra só a S1, defeito 9)
+- [x] **Mês**: uma linha por semana do horizonte com contagem e horas; células de 138px com até 6 cerimônias e "e mais N"; célula vazia tracejada; nota com o horizonte
+- [x] Painel lateral em três modos: **agregado** (cerimônias, horas, pessoa-hora, pessoas e projetos envolvidos, com concessão, acima do teto; carga por pessoa com trilha; por tipo com tags), **projeto** (prioridade e peso, urgência, prazo, mês, produtos, horas por semana e mês, cerimônias no mês, health; squad com cadeira vaga) e **pessoa** (cargo, capacidade, alvo, teto, limite, horas, folga, máximos, duração, blocos de foco, fragmentação, reuniões e horas no mês; projetos clicáveis que filtram)
 - [ ] Clique numa cerimônia abre o detalhe com participantes e justificativa (a partir da E13)
 
 **Critérios de aceite.** Seleções combinam por interseção; nada marcado significa tudo; blocos simultâneos nunca se sobrepõem; rolagem fluida com o time inteiro.
 
-#### E12 · Tela Otimizador e execução persistida · ⬜
+#### E12 · Tela Otimizador e execução persistida · 🟡
 
 **Objetivo.** Replicar o Otimizador (L2040) e gravar cada execução.
 **Requisitos.** R09, R11, R22, R23, R24, R25, R36, R46, §4.3, §4.4, §7.3, critérios 3, 4 e 5.
 
-- [ ] Faixa: Aderência ao alvo, Cobertura total, Com concessão, SLA de etapa, Adiadas, Déficit estrutural
-- [ ] Painel **Cenário**: horizonte (2, 4, 6 ou 8 semanas), perfil com descrição, chave Rebalancear cadeiras, tabela "O que este perfil autoriza ceder", premissas por cargo resumidas, botão Editar premissas
-- [ ] **Execução em três camadas**: terminal com as 9 linhas do protótipo (comando, planejador, premissas, camadas 1, 2 e 3, residual, KPI, plano pronto) e apoio "solver N ms, P projetos, Q pessoas"
-- [ ] **Leitura do agente**: texto determinístico do protótipo até a E20 trocar pelo Narrador
-- [ ] Abas **Resultado** (desejado × possível por cargo em 13 colunas e comparação de 8 indicadores atual × otimizado com Δ colorido), **Concessões**, **Trocas de cadeira** (todas as substituições, não só a primeira, defeito 4) e **Não atendida**, cada uma com estado vazio próprio
+- [x] Faixa: Aderência ao alvo, Cobertura total, Com concessão, SLA de etapa, Adiadas, Déficit estrutural
+- [x] Painel **Cenário**: horizonte (2, 4, 6 ou 8 semanas), perfil com descrição, chave Rebalancear cadeiras, tabela "O que este perfil autoriza ceder", premissas por cargo resumidas, botão Editar premissas
+- [x] **Execução em três camadas**: terminal com as 9 linhas do protótipo (comando, planejador, premissas, camadas 1, 2 e 3, residual, KPI, plano pronto) e apoio "solver N ms, P projetos, Q pessoas"
+- [x] **Leitura do agente**: texto determinístico do protótipo até a E20 trocar pelo Narrador
+- [x] Abas **Resultado** (desejado × possível por cargo em 13 colunas e comparação de 8 indicadores atual × otimizado com Δ colorido), **Concessões**, **Trocas de cadeira** (todas as substituições, não só a primeira, defeito 4) e **Não atendida**, cada uma com estado vazio próprio
 - [ ] Server action `executarOtimizacao(cenarioId)`: carrega o mundo, roda o motor em Node, grava ocorrências, participantes, concessões, trocas, não atendidas e `kpis_snapshot`, e marca o cenário como simulado
 - [ ] Validador `validarPlano` rodando em toda execução; teste com 100 sementes aleatórias
-- [ ] Teste por pessoa de 3 ou mais blocos de foco por semana na duração do cargo (hoje a média é 10,1)
-- [ ] **SLA de etapa**: hoje 88,9% na semente 7 (o Levantamento de Requisitos de um kickoff estoura o orçamento mensal pró-rata da S1). Resolver conforme a decisão D-07 antes do marco MVP
+- [x] Teste por pessoa de 3 ou mais blocos de foco por semana na duração do cargo (hoje a média é 10,1)
+- [x] **SLA de etapa**: hoje 88,9% na semente 7 (o Levantamento de Requisitos de um kickoff estoura o orçamento mensal pró-rata da S1). Resolver conforme a decisão D-07 antes do marco MVP
 
 **Critérios de aceite.** Tela idêntica ao protótipo; nenhuma violação rígida em 100 sementes; execução gravada e recarregável.
 
@@ -778,7 +786,7 @@ Regra: segue-se o protótipo, que é o artefato mais recente, salvo decisão con
 | D-04 | Revisar a cadência da Reunião de Trabalho de Discovery, que domina a agenda | Parte IV.4 | não bloqueia |
 | D-05 | Tema no perfil do usuário | Parte IV.5 | E03 |
 | D-06 | Prioridade no cliente (§9) ou no projeto (protótipo); recomendação: no cliente, herdada pelo projeto | nova | E03, E05 |
-| D-07 | Como garantir 100% de SLA com o orçamento mensal: SLA pode usar tolerância no teto mensal, reservar orçamento para cerimônias críticas ou depender do CP-SAT | nova | E12, critério 5 |
+| D-07 | ✅ **Resolvida pela correção do defeito 15**: com os squads dentro do time, o SLA de etapa fecha em 100%, fixado em teste. Pergunta original: como garantir 100% de SLA com o orçamento mensal: SLA pode usar tolerância no teto mensal, reservar orçamento para cerimônias críticas ou depender do CP-SAT | nova | E12, critério 5 |
 | D-08 | APIs disponíveis dos módulos LeverPro (Tarefas, Projetos, RH) e do Levi | nova | E19, E23 |
 | D-09 | Leitura de "zerar violações de teto" no critério 4: nenhuma alocação acima do limite aceitável e do teto absoluto, com concessões dentro da tolerância permitidas | nova | E17 |
 | D-10 | ✅ **Decidido em 11/09/2026: Outlook (Microsoft 365) via Microsoft Graph**, com permissão de aplicação e consentimento do admin do tenant | nova | E09, E16 |

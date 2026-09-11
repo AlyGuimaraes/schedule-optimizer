@@ -833,14 +833,17 @@ export type Database = {
       playbook_item_cargos: {
         Row: {
           cargo_id: string
+          ordem: number
           playbook_item_id: string
         }
         Insert: {
           cargo_id: string
+          ordem?: number
           playbook_item_id: string
         }
         Update: {
           cargo_id?: string
+          ordem?: number
           playbook_item_id?: string
         }
         Relationships: [
@@ -1119,6 +1122,7 @@ export type Database = {
           mes: number
           nome: string
           prioridade: Database["public"]["Enums"]["prioridade_cliente"] | null
+          sequencia: number
           time_id: string
         }
         Insert: {
@@ -1135,6 +1139,7 @@ export type Database = {
           mes?: number
           nome: string
           prioridade?: Database["public"]["Enums"]["prioridade_cliente"] | null
+          sequencia?: number
           time_id: string
         }
         Update: {
@@ -1151,6 +1156,7 @@ export type Database = {
           mes?: number
           nome?: string
           prioridade?: Database["public"]["Enums"]["prioridade_cliente"] | null
+          sequencia?: number
           time_id?: string
         }
         Relationships: [

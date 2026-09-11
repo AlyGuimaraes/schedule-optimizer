@@ -2,7 +2,7 @@
 
 import { create } from "zustand"
 
-import type { Config, Mundo, Simulacao } from "@/lib/dominio"
+import type { Config, Mundo, PerfilId, Simulacao } from "@/lib/dominio"
 import type { DadosMundo, Indices } from "@/lib/dados/mapeador"
 
 export type Cenario = "base" | "otm"
@@ -18,11 +18,24 @@ interface CadenciaState {
   cenario: Cenario
   /** linha de estado do cabeçalho, em mono 10.5px, como no protótipo */
   estado: Estado
+  /** true enquanto o botão Otimizar roda; o terminal mostra esqueleto */
+  otimizando: boolean
+  /** muda a cada execução do Otimizar, para o terminal repetir a animação */
+  execucao: number
+  dadosAtuais: DadosMundo | null
+
   setCenario: (cenario: Cenario) => void
   avisar: (texto: string, duracao?: number) => void
   inicializar: (dados: DadosMundo | null, erro: string | null) => void
   recalcular: (motivo?: string) => Promise<void>
   otimizar: () => Promise<void>
+  setHorizonte: (h: number) => void
+  setPerfil: (p: PerfilId) => void
+  setRebalancear: (v: boolean) => void
+  /** edição otimista da configuração; `adiado` segura o recálculo por 300ms, como nas células */
+  editarConfig: (fn: (c: Config) => Config, opcoes?: { adiado?: boolean; motivo?: string }) => void
+  /** edição otimista do mundo (playbook, etapas), recalculando em seguida */
+  editarMundo: (fn: (m: Mundo) => Mundo, motivo?: string) => void
 }
 
 type Resposta = { id: number; simulacao?: Simulacao; ms?: number; erro?: string }
@@ -31,6 +44,7 @@ let worker: Worker | null = null
 let proximoId = 0
 const pendentes = new Map<number, (r: Resposta) => void>()
 let timerEstado: ReturnType<typeof setTimeout> | undefined
+let timerRecalculo: ReturnType<typeof setTimeout> | undefined
 
 function obterWorker(): Worker {
   if (!worker) {
@@ -66,22 +80,31 @@ export const useCadencia = create<CadenciaState>((set, get) => ({
   erro: null,
   cenario: "otm",
   estado: ocioso(null),
+  otimizando: false,
+  execucao: 0,
+  dadosAtuais: null,
 
   setCenario: (cenario) => set({ cenario }),
 
-  avisar: (texto, duracao = 2400) => {
+  avisar: (texto, duracao = 2200) => {
     set({ estado: { texto, vivo: true } })
     clearTimeout(timerEstado)
     timerEstado = setTimeout(() => set({ estado: ocioso(get().ms) }), duracao)
   },
 
+  // Recebe o mundo do servidor. Depois de cada gravação o layout recarrega e entrega um novo
+  // objeto; o cenário (horizonte, perfil, rebalanceamento) é escolha da sessão e é preservado.
   inicializar: (dados, erro) => {
     if (!dados) {
       set({ erro, estado: { texto: "sem conexão com o banco", vivo: true } })
       return
     }
-    if (get().mundo) return
-    set({ mundo: dados.mundo, config: dados.config, indices: dados.indices, erro: null })
+    if (get().dadosAtuais === dados) return
+    const atual = get().config
+    const config = atual
+      ? { ...dados.config, horizonte: atual.horizonte, perfil: atual.perfil, rebalancear: atual.rebalancear }
+      : dados.config
+    set({ mundo: dados.mundo, config, indices: dados.indices, erro: null, dadosAtuais: dados })
     void get().recalcular()
   },
 
@@ -91,7 +114,7 @@ export const useCadencia = create<CadenciaState>((set, get) => ({
     const id = proximoId + 1
     const r = await executar(mundo, config)
     // resposta de uma execução antiga: descartada
-    if (r.id < id) return
+    if (r.id < id || r.id < proximoId) return
     if (r.erro || !r.simulacao) {
       set({ erro: r.erro ?? "falha no motor" })
       get().avisar(`erro no motor: ${r.erro}`, 4000)
@@ -104,9 +127,34 @@ export const useCadencia = create<CadenciaState>((set, get) => ({
 
   // Botão Otimizar: pausa mínima de 620ms para a execução ser percebida, como no protótipo.
   otimizar: async () => {
-    set({ estado: { texto: "otimizando", vivo: true } })
+    set({ estado: { texto: "otimizando", vivo: true }, otimizando: true })
     const espera = new Promise((r) => setTimeout(r, 620))
     await Promise.all([get().recalcular(), espera])
-    get().avisar(`plano recalculado, solver ${get().ms} ms`)
+    set({ otimizando: false, execucao: get().execucao + 1 })
+    get().avisar(`plano recalculado, solver ${get().ms} ms`, 2400)
+  },
+
+  setHorizonte: (h) => get().editarConfig((c) => ({ ...c, horizonte: h })),
+  setPerfil: (p) => get().editarConfig((c) => ({ ...c, perfil: p })),
+  setRebalancear: (v) => get().editarConfig((c) => ({ ...c, rebalancear: v })),
+
+  editarConfig: (fn, opcoes = {}) => {
+    const config = get().config
+    if (!config) return
+    set({ config: fn(config) })
+    clearTimeout(timerRecalculo)
+    if (opcoes.adiado) {
+      set({ estado: { texto: "recalculando", vivo: true } })
+      timerRecalculo = setTimeout(() => void get().recalcular(), 300)
+    } else {
+      void get().recalcular(opcoes.motivo ?? "cenário recalculado")
+    }
+  },
+
+  editarMundo: (fn, motivo) => {
+    const mundo = get().mundo
+    if (!mundo) return
+    set({ mundo: fn(mundo) })
+    void get().recalcular(motivo ?? "cenário replanejado")
   },
 }))

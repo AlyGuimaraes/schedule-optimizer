@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 
-import { TelaPendente } from "@/components/cadencia/tela-pendente"
+import { TelaOtimizador } from "@/components/telas/otimizador"
 
 export const metadata: Metadata = { title: "Otimizador" }
 
 export default function Page() {
-  return <TelaPendente slug="otimizador" />
+  return <TelaOtimizador />
 }

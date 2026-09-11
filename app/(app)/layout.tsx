@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 
 import { AppSidebar } from "@/components/cadencia/app-sidebar"
 import { CadenciaProvider } from "@/components/cadencia/cadencia-provider"
+import { DicaFlutuante } from "@/components/cadencia/dica-flutuante"
 import { SiteHeader } from "@/components/cadencia/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { carregarMundo } from "@/lib/dados/mundo"
@@ -23,6 +24,7 @@ export default async function AppLayout({
           <SiteHeader />
           {children}
         </SidebarInset>
+        <DicaFlutuante />
       </CadenciaProvider>
     </SidebarProvider>
   )
