@@ -13,8 +13,20 @@ import {
   VazioTela,
   tomOcupacao,
 } from "@/components/cadencia/primitivas"
+import { EditorCab, Modal } from "@/components/cadencia/modal"
 import { estiloHue, hueCer } from "@/lib/cores"
-import { almoco, etapaDe, geralDe, pesoCliente, premDe, type Cerimonia } from "@/lib/dominio"
+import { ancorar, removerAncora } from "@/lib/dados/cenarios"
+import {
+  almoco,
+  chaveSerie,
+  etapaDe,
+  geralDe,
+  justificativa,
+  pesoCliente,
+  premDe,
+  type Cerimonia,
+} from "@/lib/dominio"
+import { useAcao } from "@/lib/estado/acao"
 import { useListaParametro, useParametro } from "@/lib/estado/url"
 import { DIAS_LB, hhmm, n0, n1, primeiro } from "@/lib/formato"
 
@@ -58,6 +70,7 @@ function Agenda(ctx: Contexto) {
   const [projetosUrl, setProjetos] = useListaParametro("clientes")
   const [painel, setPainel] = useState<null | "pessoas" | "projetos">(null)
   const [busca, setBusca] = useState("")
+  const [detalhe, setDetalhe] = useState<{ ev: Cerimonia; semana: number } | null>(null)
 
   const pessoasSel = pessoasUrl.filter((id) => mundo.pessoas[id])
   const projetosSel = projetosUrl.filter((id) => mundo.projetos[id])
@@ -291,6 +304,7 @@ function Agenda(ctx: Contexto) {
                       key={ev.id}
                       type="button"
                       className="cer"
+                      onClick={() => setDetalhe({ ev, semana: semanaIdx + 1 })}
                       style={{
                         ...estiloHue(hueCer(ev.tipo)),
                         top: slot * ALT + 1,
@@ -386,6 +400,7 @@ function Agenda(ctx: Contexto) {
                             key={ev.id}
                             type="button"
                             className="mcer"
+                            onClick={() => setDetalhe({ ev, semana: wi + 1 })}
                             style={estiloHue(hueCer(ev.tipo))}
                             data-cedido={ev.relaxado ? 1 : 0}
                             data-dica={`${ev.tipo}, ${ev.projeto}. ${hhmm(ev.slot ?? 0)}. Com ${quem(ev)}.`}
@@ -522,7 +537,105 @@ function Agenda(ctx: Contexto) {
         <section>{corpo}</section>
         <section>{lateral}</section>
       </div>
+      <DetalheCerimonia
+        ctx={ctx}
+        detalhe={detalhe}
+        onFechar={() => setDetalhe(null)}
+        onVerProjeto={(id) => {
+          setProjetos([id])
+          setDetalhe(null)
+        }}
+      />
     </>
+  )
+}
+
+/** Detalhe de uma cerimônia: por que caiu neste horário (§12) e a âncora do cliente (E13). */
+function DetalheCerimonia({
+  ctx,
+  detalhe,
+  onFechar,
+  onVerProjeto,
+}: {
+  ctx: Contexto
+  detalhe: { ev: Cerimonia; semana: number } | null
+  onFechar: () => void
+  onVerProjeto: (projetoId: number) => void
+}) {
+  const acao = useAcao()
+  if (!detalhe) return null
+  const { mundo, config, simulacao: sim, cenario, indices } = ctx
+  const { ev, semana } = detalhe
+  const w = sim.semanas[semana - 1]
+  const dia = ev.dia ?? 0
+  const slot = ev.slot ?? 0
+  const ancorada = !!config.ancoras?.[chaveSerie(ev)]
+  const frases =
+    cenario === "otm" && w
+      ? justificativa(ev, w.otm, mundo, config)
+      : [
+          "Agenda vigente simulada: o horário foi marcado no maior bloco livre comum, sem política de premissas.",
+          `Participantes: ${ev.participantes.map((p, i) => `${mundo.pessoas[p]?.nome} (${ev.papeis[i]})`).join(", ")}.`,
+        ]
+  const projetoId = indices.projetos[ev.projetoId]
+  const itemId = indices.playbook[`${ev.fase}|${ev.tipo}`]
+
+  return (
+    <Modal aberto largura={600} onFechar={onFechar} rotulo={ev.tipo}>
+      <EditorCab
+        titulo={ev.tipo}
+        meta={`${ev.projeto} · semana ${semana}, ${DIAS_LB[dia]} ${hhmm(slot)} às ${hhmm(slot + ev.slots)}`}
+      />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        <TagCerimonia tipo={ev.tipo} />
+        <SeloFase fase={ev.fase} etapas={mundo.etapas} />
+        {ev.camada ? (
+          <Selo tom={ev.camada === 3 ? "aviso" : ev.camada === 2 ? "acento" : "ok"}>camada {ev.camada}</Selo>
+        ) : null}
+        {ev.sla ? <Selo tom="ruim">SLA {ev.prazoDias}d</Selo> : null}
+        {ancorada ? <Selo tom="acento">ancorada</Selo> : null}
+        {!ev.obrig ? <Selo tom="neutro">opcional</Selo> : null}
+      </div>
+      <SecCab titulo="Por que este horário" />
+      <ul className="nota" style={{ display: "grid", gap: 6, paddingLeft: 18, listStyle: "disc" }}>
+        {frases.map((f) => (
+          <li key={f}>{f}</li>
+        ))}
+      </ul>
+      <div className="editor-pe">
+        {acao.erro ? <span className="msg">{acao.erro}</span> : null}
+        <button type="button" className="mini-btn" onClick={() => onVerProjeto(ev.projetoId)}>
+          Ver o projeto
+        </button>
+        {cenario === "otm" && projetoId && itemId ? (
+          ancorada ? (
+            <button
+              type="button"
+              className="btn leve"
+              disabled={acao.pendente}
+              onClick={() => acao.executar(() => removerAncora(projetoId, itemId), "âncora removida, cenário replanejado", onFechar)}
+            >
+              Remover âncora
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn"
+              disabled={acao.pendente}
+              onClick={() =>
+                acao.executar(() => ancorar({ projetoId, itemId, dia, slot }), "série ancorada neste horário", onFechar)
+              }
+            >
+              Ancorar neste horário
+            </button>
+          )
+        ) : null}
+      </div>
+      <p className="meta" style={{ marginTop: 10 }}>
+        Ancorar fixa a série inteira neste dia e horário, em todas as semanas, como restrição rígida: o otimizador a
+        aloca antes de tudo. Serve para quando o cliente impõe o horário.
+      </p>
+    </Modal>
   )
 }
 

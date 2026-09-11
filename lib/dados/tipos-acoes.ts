@@ -55,5 +55,47 @@ export interface CerimoniaEntrada {
 
 export type CampoCerimonia = "dur" | "cada" | "prio" | "obrig"
 
+export interface ResumoCenario {
+  demanda: number
+  alocadas: number
+  adiadas: number
+  cobertura: number
+  obrigatoria: number
+  sla: number
+  aderencia: number
+  produtivo: number
+  deficitFte: number
+  concessoes: number
+  trocas: number
+  horasMes: number
+  reunioesMes: number
+  /** % das cerimônias que ficaram no lugar do plano vigente; null sem plano vigente */
+  estabilidade: number | null
+  solverMs: number
+  ocorrencias: number
+}
+
+export interface CenarioLista {
+  id: string
+  nome: string
+  status: "rascunho" | "simulado" | "publicado" | "arquivado"
+  perfil: string
+  horizonte: number
+  horizonteInicio: string
+  criadoEm: string
+  publicadoEm: string | null
+  resumo: ResumoCenario | null
+  premissas: Record<string, unknown> | null
+}
+
+export interface DiffCenario {
+  semVigente: boolean
+  novas: number
+  movidas: number
+  canceladas: number
+  mantidas: number
+  porPessoa: { nome: string; novas: number; movidas: number; canceladas: number }[]
+}
+
 export type PremissaCargoParcial = Partial<PremissasCargoEntrada>
 export type PremissasGeraisParcial = Partial<PremissasGerais>

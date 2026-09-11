@@ -135,6 +135,14 @@ export interface Config {
   acumulado?: number[]
   /** semana do horizonte, base do orçamento mensal pró-rata */
   semanaIdx?: number
+  /**
+   * Plano vigente (publicado), por `chaveOcorrencia`. Quando presente, mover uma cerimônia de
+   * lugar custa `pesoEstabilidade` (termo w6 do §4.1). Ausente, o motor é o do protótipo.
+   */
+  planoVigente?: Record<string, { dia: number; slot: number }>
+  pesoEstabilidade?: number
+  /** Cerimônias ancoradas pelo cliente (§12), por `chaveSerie`: restrição rígida, alocadas primeiro. */
+  ancoras?: Record<string, { dia: number; slot: number }>
 }
 
 export interface TrocaCadeira {
@@ -169,9 +177,16 @@ export interface Cerimonia {
   relaxado?: boolean
   trocas?: TrocaCadeira[]
   motivo?: string
+  /** camada que alocou: 1 dentro do alvo, 2 troca de cadeira, 3 concessão (§4.3) */
+  camada?: 1 | 2 | 3
+  ancorada?: boolean
+  /** saiu do lugar que tinha no plano vigente */
+  movida?: boolean
 }
 
 export interface Concessao {
+  /** id da cerimônia (na demanda da semana) que motivou a concessão */
+  evId: number
   pessoa: string
   pessoaId: number
   papel: Papel
@@ -269,6 +284,8 @@ export interface ResultadoOtimizacao {
   perfil: Perfil
   perfilId: PerfilId
   kpi?: KpiCenario
+  /** só com plano vigente: quantas cerimônias comparáveis saíram do lugar (§6, estabilidade do plano) */
+  estabilidade?: { comparaveis: number; movidas: number; pct: number }
 }
 
 export interface SemanaSimulada {

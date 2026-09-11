@@ -96,6 +96,55 @@ export interface DadosMundo {
   mundo: Mundo
   config: Config
   indices: Indices
+  /** cenário publicado, cujo plano segura a estabilidade do replanejamento (E13) */
+  vigente?: { id: string; nome: string; publicadoEm: string } | null
+}
+
+/** Formato devolvido pela RPC `carregar_plano()`. */
+export interface PlanoBanco {
+  publicado: { id: string; nome: string; publicado_em: string } | null
+  ancoras: { projeto_id: string; playbook_item_id: string; dia: number; slot: number }[]
+  ocorrencias: { projeto_id: string; playbook_item_id: string; semana: number; dia: number; slot: number }[]
+}
+
+/**
+ * Leva ao motor o plano vigente (termo de estabilidade) e as âncoras, com as chaves do domínio:
+ * `projeto|cerimônia|semana` e `projeto|cerimônia`.
+ */
+export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco): DadosMundo {
+  const projeto = new Map(dados.indices.projetos.map((id, i) => [id, i]))
+  const tipo = new Map(
+    Object.entries(dados.indices.playbook).map(([chave, id]) => [id, chave.slice(chave.indexOf("|") + 1)])
+  )
+  const chave = (p: string, item: string) => {
+    const i = projeto.get(p)
+    const t = tipo.get(item)
+    return i === undefined || t === undefined ? null : `${i}|${t}`
+  }
+
+  const ancoras: Record<string, { dia: number; slot: number }> = {}
+  plano.ancoras.forEach((a) => {
+    const k = chave(a.projeto_id, a.playbook_item_id)
+    if (k) ancoras[k] = { dia: a.dia, slot: a.slot }
+  })
+  const vigente: Record<string, { dia: number; slot: number }> = {}
+  plano.ocorrencias.forEach((o) => {
+    const k = chave(o.projeto_id, o.playbook_item_id)
+    if (k) vigente[`${k}|${o.semana}`] = { dia: o.dia, slot: o.slot }
+  })
+
+  return {
+    ...dados,
+    config: {
+      ...dados.config,
+      ancoras: Object.keys(ancoras).length ? ancoras : undefined,
+      planoVigente: Object.keys(vigente).length ? vigente : undefined,
+      pesoEstabilidade: 3,
+    },
+    vigente: plano.publicado
+      ? { id: plano.publicado.id, nome: plano.publicado.nome, publicadoEm: plano.publicado.publicado_em }
+      : null,
+  }
 }
 
 /** Minutos do banco para slots de 30 minutos do motor. */

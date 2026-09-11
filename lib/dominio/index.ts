@@ -13,6 +13,7 @@ export * from "./kpis"
 export * from "./capacidade"
 export * from "./simulacao"
 export * from "./validador"
+export * from "./justificativa"
 
 import { clonar, CLIENTES_PADRAO, ETAPAS_PADRAO, GERAL_PADRAO, PREM_PADRAO } from "./padroes"
 import type { Config } from "./tipos"

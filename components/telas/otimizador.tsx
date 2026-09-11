@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 
 import { ComDados, type Contexto } from "@/components/cadencia/com-dados"
 import {
@@ -19,9 +20,10 @@ import { useCadencia } from "@/lib/estado/cadencia"
 import { useParametro } from "@/lib/estado/url"
 import { n0, n1, pc } from "@/lib/formato"
 
+import { AbaCenarios, SalvarCenario } from "./cenarios"
 import { papeisDe } from "./comum"
 
-const ABAS = ["resultado", "concessoes", "trocas", "pendencias"] as const
+const ABAS = ["resultado", "concessoes", "trocas", "pendencias", "cenarios"] as const
 type AbaOtimizador = (typeof ABAS)[number]
 
 export function TelaOtimizador() {
@@ -37,6 +39,8 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
   const setRebalancear = useCadencia((s) => s.setRebalancear)
   const otimizando = useCadencia((s) => s.otimizando)
   const execucao = useCadencia((s) => s.execucao)
+  const vigente = useCadencia((s) => s.dadosAtuais?.vigente ?? null)
+  const [salvando, setSalvando] = useState(false)
 
   const w = sim.semanas[0]
   const b = w.base.kpi
@@ -110,6 +114,7 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
     { id: "concessoes" as const, rotulo: "Concessões", apoio: `${conc.length} registradas` },
     { id: "trocas" as const, rotulo: "Trocas de cadeira", apoio: `${trocas.reduce((s, t) => s + t.subs.length, 0)} aplicadas` },
     { id: "pendencias" as const, rotulo: "Não atendida", apoio: `${adi.length} cerimônias` },
+    { id: "cenarios" as const, rotulo: "Cenários", apoio: vigente ? `vigente: ${vigente.nome}` : "salvar, comparar, publicar" },
   ]
 
   return (
@@ -183,6 +188,17 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
           <Chave ligada={config.rebalancear} onChange={setRebalancear}>
             Rebalancear cadeiras
           </Chave>
+          <div className="campo">
+            <label>Plano vigente</label>
+            <span className="dica">
+              {vigente
+                ? `${vigente.nome}, publicado em ${new Date(vigente.publicadoEm).toLocaleDateString("pt-BR")}. Mover uma cerimônia do lugar dele tem custo no replanejamento.`
+                : "Nenhum plano publicado ainda. Salve esta execução como cenário e publique para ter uma referência de estabilidade."}
+            </span>
+            <button type="button" className="btn leve" style={{ justifySelf: "start", width: "fit-content" }} onClick={() => setSalvando(true)}>
+              Salvar como cenário
+            </button>
+          </div>
           <div className="campo">
             <label>O que este perfil autoriza ceder</label>
             <table>
@@ -489,8 +505,12 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
               <VazioTela titulo="Toda a demanda foi atendida">Nenhuma cerimônia ficou fora do plano.</VazioTela>
             )
           ) : null}
+
+          {aba === "cenarios" ? <AbaCenarios /> : null}
         </div>
       </section>
+
+      <SalvarCenario aberto={salvando} config={config} onFechar={() => setSalvando(false)} onSalvo={() => setAba("cenarios")} />
     </>
   )
 }

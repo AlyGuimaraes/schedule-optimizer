@@ -50,6 +50,13 @@ export function custoDia(
   return { penal: livres - foco + blocos * 0.5, foco, livres }
 }
 
+/** Identidade de uma ocorrência entre execuções: projeto, cerimônia e semana do horizonte. */
+export const chaveOcorrencia = (ev: Pick<Cerimonia, "projetoId" | "tipo">, semana: number) =>
+  `${ev.projetoId}|${ev.tipo}|${semana}`
+
+/** Identidade de uma série (todas as semanas), usada pelas âncoras. */
+export const chaveSerie = (ev: Pick<Cerimonia, "projetoId" | "tipo">) => `${ev.projetoId}|${ev.tipo}`
+
 /**
  * Solver em três camadas (§4.3):
  *   1. tudo dentro da premissa alvo
@@ -113,6 +120,11 @@ export function otimizar(
       c += folga <= 0 ? 2.5 : Math.max(0, 1.4 - folga)
     })
     if (PF.ancorar && ev && d !== ev.projetoId % DIAS) c += 2.2
+    // estabilidade (w6): sair do lugar do plano vigente tem custo; sem plano vigente, nada muda
+    if (cfg.planoVigente && ev) {
+      const v = cfg.planoVigente[chaveOcorrencia(ev, semanaIdx)]
+      if (v && (v.dia !== d || v.slot !== s)) c += cfg.pesoEstabilidade ?? 3
+    }
     // cerimônia com prazo curto é puxada para o começo da semana e do dia
     const urg = ev && ev.sla ? 2.4 : 0.02
     return c + s * (ev && ev.sla ? 0.06 : 0.01) + d * urg
@@ -147,6 +159,7 @@ export function otimizar(
         cedidas.push({ premissa: "duração máx. da reunião", alvo: c.duracaoMax / 2, valor: ev.slots / 2, un: "h" })
       cedidas.forEach((x) =>
         concessoes.push({
+          evId: ev.id,
           pessoa: nome,
           pessoaId: p,
           papel: pessoas[p].papel,
@@ -158,11 +171,12 @@ export function otimizar(
     })
   }
 
-  function confirmar(ev: Cerimonia, m: { d: number; s: number }, relaxado: boolean) {
+  function confirmar(ev: Cerimonia, m: { d: number; s: number }, relaxado: boolean, camada: 1 | 2 | 3 = relaxado ? 3 : 1) {
     const h = ev.dur / 60
     if (relaxado) registrar(ev, ev.participantes, m.d, m.s, h)
     marcar(oc, ev, m.d, m.s)
     ev.relaxado = !!relaxado
+    ev.camada = camada
     ev.participantes.forEach((p) => {
       carga[p] += h
       porDia[p][m.d]++
@@ -183,9 +197,25 @@ export function otimizar(
       rank(a) - rank(b) || b.participantes.length - a.participantes.length || b.dur - a.dur
   )
 
+  // ---- âncoras: horário imposto pelo cliente é restrição rígida, alocado antes de tudo (§12) ----
+  const ancoradas = new Set<number>()
+  if (cfg.ancoras) {
+    ordem.forEach((ev) => {
+      const a = cfg.ancoras?.[chaveSerie(ev)]
+      if (!a) return
+      if (a.slot + ev.slots > G.fim) return
+      if (ev.participantes.every((p) => livre(oc, p, a.dia, a.slot, ev.slots, G, true))) {
+        confirmar(ev, { d: a.dia, s: a.slot }, false)
+        ev.ancorada = true
+        ancoradas.add(ev.id)
+      }
+    })
+  }
+
   // ---- camada 1: tudo dentro da premissa alvo ----
   const sobra1: Cerimonia[] = []
   ordem.forEach((ev) => {
+    if (ancoradas.has(ev.id)) return
     const h = ev.dur / 60
     if (
       ev.participantes.some(
@@ -246,7 +276,7 @@ export function otimizar(
       const m = melhorSlot(novos, cand.slots, h, false, cand)
       if (m) {
         cand.trocas = subs
-        confirmar(cand, m, false)
+        confirmar(cand, m, false, 2)
         trocas.push({ ev: cand, subs })
       } else sobra2.push(ev)
     })
@@ -312,6 +342,23 @@ export function otimizar(
     slaViolado,
   }
 
+  // estabilidade do plano: quantas cerimônias comparáveis saíram do lugar do plano vigente
+  let estabilidade: ResultadoOtimizacao["estabilidade"]
+  if (cfg.planoVigente) {
+    let comparaveis = 0
+    let movidas = 0
+    alocadas.forEach((ev) => {
+      const v = cfg.planoVigente?.[chaveOcorrencia(ev, semanaIdx)]
+      if (!v) return
+      comparaveis++
+      if (v.dia !== ev.dia || v.slot !== ev.slot) {
+        movidas++
+        ev.movida = true
+      }
+    })
+    estabilidade = { comparaveis, movidas, pct: comparaveis ? +((1 - movidas / comparaveis) * 100).toFixed(1) : 100 }
+  }
+
   return {
     oc,
     alocadas,
@@ -325,5 +372,6 @@ export function otimizar(
     PP,
     perfil: PF,
     perfilId: cfg.perfil,
+    estabilidade,
   }
 }

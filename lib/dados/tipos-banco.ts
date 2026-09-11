@@ -150,6 +150,54 @@ export type Database = {
           },
         ]
       }
+      ancoras: {
+        Row: {
+          autor: string | null
+          criado_em: string
+          dia: number
+          id: string
+          motivo: string | null
+          playbook_item_id: string
+          projeto_id: string
+          slot: number
+        }
+        Insert: {
+          autor?: string | null
+          criado_em?: string
+          dia: number
+          id?: string
+          motivo?: string | null
+          playbook_item_id: string
+          projeto_id: string
+          slot: number
+        }
+        Update: {
+          autor?: string | null
+          criado_em?: string
+          dia?: number
+          id?: string
+          motivo?: string | null
+          playbook_item_id?: string
+          projeto_id?: string
+          slot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ancoras_playbook_item_id_fkey"
+            columns: ["playbook_item_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ancoras_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auditoria: {
         Row: {
           acao: string
@@ -224,6 +272,7 @@ export type Database = {
           perfil: Database["public"]["Enums"]["perfil_otimizacao"]
           publicado_em: string | null
           rebalancear: boolean
+          resumo: Json | null
           snapshot_premissas: Json | null
           solver: string
           status: Database["public"]["Enums"]["status_cenario"]
@@ -241,6 +290,7 @@ export type Database = {
           perfil?: Database["public"]["Enums"]["perfil_otimizacao"]
           publicado_em?: string | null
           rebalancear?: boolean
+          resumo?: Json | null
           snapshot_premissas?: Json | null
           solver?: string
           status?: Database["public"]["Enums"]["status_cenario"]
@@ -258,6 +308,7 @@ export type Database = {
           perfil?: Database["public"]["Enums"]["perfil_otimizacao"]
           publicado_em?: string | null
           rebalancear?: boolean
+          resumo?: Json | null
           snapshot_premissas?: Json | null
           solver?: string
           status?: Database["public"]["Enums"]["status_cenario"]
@@ -612,6 +663,7 @@ export type Database = {
           camada: number
           cenario_id: string
           criado_em: string
+          dia: number | null
           fim: string
           id: string
           inicio: string
@@ -622,6 +674,7 @@ export type Database = {
           semana: number
           serie_id: string | null
           sla: boolean
+          slot: number | null
           status: Database["public"]["Enums"]["status_ocorrencia"]
         }
         Insert: {
@@ -629,6 +682,7 @@ export type Database = {
           camada?: number
           cenario_id: string
           criado_em?: string
+          dia?: number | null
           fim: string
           id?: string
           inicio: string
@@ -639,6 +693,7 @@ export type Database = {
           semana: number
           serie_id?: string | null
           sla?: boolean
+          slot?: number | null
           status?: Database["public"]["Enums"]["status_ocorrencia"]
         }
         Update: {
@@ -646,6 +701,7 @@ export type Database = {
           camada?: number
           cenario_id?: string
           criado_em?: string
+          dia?: number | null
           fim?: string
           id?: string
           inicio?: string
@@ -656,6 +712,7 @@ export type Database = {
           semana?: number
           serie_id?: string | null
           sla?: boolean
+          slot?: number | null
           status?: Database["public"]["Enums"]["status_ocorrencia"]
         }
         Relationships: [
@@ -1472,6 +1529,7 @@ export type Database = {
     }
     Functions: {
       carregar_mundo: { Args: never; Returns: Json }
+      carregar_plano: { Args: never; Returns: Json }
       definir_premissa_cargo: {
         Args: { p_cargo_id: string; p_valores: Json }
         Returns: string
