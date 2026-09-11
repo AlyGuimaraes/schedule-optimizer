@@ -17,6 +17,7 @@ export * from "./justificativa"
 export * from "./modificadores"
 export * from "./calendario"
 export * from "./custos"
+export * from "./contratacao"
 
 import { clonar, CLIENTES_PADRAO, ETAPAS_PADRAO, GERAL_PADRAO, PREM_PADRAO } from "./padroes"
 import type { Config } from "./tipos"

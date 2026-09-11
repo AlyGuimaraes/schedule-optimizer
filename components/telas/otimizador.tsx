@@ -27,6 +27,7 @@ import { leituraDeterministica } from "@/lib/ia/leitura-deterministica"
 import { contextoDaOperacao, resumirExecucao } from "@/lib/ia/resumo"
 
 import { AbaCenarios, SalvarCenario } from "./cenarios"
+import { AbaSimulacao } from "./simulacao"
 import { papeisDe } from "./comum"
 
 /** Horizonte em datas reais: período, feriados e a janela congelada pela antecedência de 48h. */
@@ -49,7 +50,7 @@ function textoCalendario(config: Config): string | null {
   return partes.join(" ")
 }
 
-const ABAS = ["resultado", "concessoes", "trocas", "pendencias", "cenarios"] as const
+const ABAS = ["resultado", "concessoes", "trocas", "pendencias", "cenarios", "simulacao"] as const
 type AbaOtimizador = (typeof ABAS)[number]
 
 /** `narradorIa` vem do servidor: com a chave de API configurada, a leitura passa pelo Narrador. */
@@ -59,7 +60,7 @@ export function TelaOtimizador({ narradorIa = false }: { narradorIa?: boolean })
 
 // Porte de telaOtimizador() do protótipo (§7.3): seis indicadores, configuração e execução
 // em duas colunas, e as quatro tabelas de detalhe em abas.
-function Otimizador({ mundo, config, simulacao: sim, cenario, ms, narradorIa }: Contexto & { narradorIa: boolean }) {
+function Otimizador({ mundo, config, simulacao: sim, cenario, ms, indices, narradorIa }: Contexto & { narradorIa: boolean }) {
   const [aba, setAba] = useParametro<AbaOtimizador>("aba", "resultado", ABAS)
   const setHorizonte = useCadencia((s) => s.setHorizonte)
   const setPerfil = useCadencia((s) => s.setPerfil)
@@ -145,6 +146,7 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms, narradorIa }: 
     { id: "trocas" as const, rotulo: "Trocas de cadeira", apoio: `${trocas.reduce((s, t) => s + t.subs.length, 0)} aplicadas` },
     { id: "pendencias" as const, rotulo: "Não atendida", apoio: `${adi.length} cerimônias` },
     { id: "cenarios" as const, rotulo: "Cenários", apoio: vigente ? `vigente: ${vigente.nome}` : "salvar, comparar, publicar" },
+    { id: "simulacao" as const, rotulo: "E se", apoio: "contratação, cargo e projeção" },
   ]
 
   return (
@@ -552,6 +554,7 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms, narradorIa }: 
           ) : null}
 
           {aba === "cenarios" ? <AbaCenarios /> : null}
+          {aba === "simulacao" ? <AbaSimulacao ctx={{ mundo, config, simulacao: sim, cenario, ms, indices }} /> : null}
         </div>
       </section>
 

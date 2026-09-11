@@ -161,14 +161,14 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E12 | Tela Otimizador e execução persistida | 2 Otimizador | E01, E04 | 5 | ✅ |
 | E13 | Cenários, publicação e estabilidade | 2 Otimizador | E12 | 5 | ✅ |
 | E14 | Premissas avançadas e modificadores automáticos | 2 Otimizador | E07, E12 | 4 | ✅ |
-| E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | ⬜ |
+| E15 | Solver CP-SAT | 2 Otimizador | E02, E03 | 10 | 🟡 worker local pronto; deploy, fila e ligação no app dependem da D-11 |
 | E16 | Escrita nos calendários e reconciliação | 2 Otimizador | E09, E13 | 8 | ⬜ |
 | E17 | **Marco MVP**: aceite, hardening e go-live | 2 Otimizador | E05 a E16 | 5 | ⬜ |
 | E18 | Fundação da camada de IA | 3 IA | E04 | 3 | 🟡 pronta sem a chave; evals, cache e lotes dependem dela |
 | E19 | Classificador, Planejador de Cadência, Compositor de Squad | 3 IA | E18, E14 | 5 | ⬜ |
 | E20 | Narrador, Orquestrador, Sentinela | 3 IA | E18, E13, E16 | 6 | 🟡 Narrador ligado com fallback; Orquestrador e Sentinela pendentes |
 | E21 | Planejamento semanal automatizado | 3 IA | E19, E20 | 3 | ⬜ |
-| E22 | Simulação de contratação e déficit | 4 Inteligência | E13 | 4 | ⬜ |
+| E22 | Simulação de contratação e déficit | 4 Inteligência | E13 | 4 | ✅ |
 | E23 | Integrações Tarefas, Projetos e RH | 4 Inteligência | E03, decisão D-08 | 6 | ⬜ |
 | E24 | Custo por cliente e benchmark por produto | 4 Inteligência | E08 | 4 | 🟡 complexidade do produto depende da E23 |
 | E25 | Matriz de competências (condicional) | 4 Inteligência | decisão D-02 | 8 | ⬜ |
@@ -583,20 +583,21 @@ flowchart LR
 
 **Critérios de aceite.** Cada modificador com teste; exceção visível no modal da pessoa e do projeto; demanda do trimestre gerada para 112 projetos.
 
-#### E15 · Solver CP-SAT · ⬜
+#### E15 · Solver CP-SAT · 🟡
 
 **Objetivo.** Substituir a heurística gulosa por programação por restrições em produção (§4.1), mantendo o guloso como fallback e referência.
 **Requisitos.** R09, §4.1, §4.2, §12.
 
-- [ ] Serviço em `solver/`: Python 3.12, OR-Tools, FastAPI, container em Cloud Run southamerica-east1 ou equivalente (decisão D-11), autenticado por token assinado
+- [x] Serviço em `solver/`: Python 3.12, OR-Tools, FastAPI (`POST /resolver`, `GET /saude`), rodando localmente com segredo compartilhado opcional (`SOLVER_TOKEN`). Container, deploy e token assinado dependem da decisão D-11
 - [ ] Fila `solver_jobs` no Supabase; disparo pela server action; o worker grava o resultado com service key
-- [ ] Contrato único: JSON Schema compartilhado entre o Zod do motor TS e o Pydantic do worker
-- [ ] Modelo: variáveis booleanas por cerimônia × dia × slot inicial viável, pré-filtradas por jornada, almoço, dia protegido, duração máxima e janela protegida de cada participante; intervalos opcionais por participante com `AddNoOverlap` por pessoa, estendidos pelo intervalo obrigatório (R3, R5); unicidade e alocação garantida (R1, R2); limites diários (R8, R9); teto semanal com variável de folga até o limite aceitável (R10, camada 3); orçamento mensal pró-rata acumulado (R11)
-- [ ] Objetivo ponderado w1 a w8 do §4.1: fragmentação, desvio do alvo, não alocadas, trocas de contexto, desbalanceamento entre pares, instabilidade, fora da faixa preferencial e atraso de SLA; pesos por perfil
-- [ ] Camadas como otimização lexicográfica (sem folga → com troca de cadeira → com folga); concessões derivadas das folgas positivas
-- [ ] Warm start com a solução gulosa (`AddHint`), limite de 60 a 120s, 8 workers, decomposição por squad acima de um limiar
-- [ ] Comparação guloso × CP-SAT no mesmo cenário; fallback automático em timeout ou inviabilidade
-- [ ] Mesmo `validarPlano` da E02 sobre a saída
+- [x] Contrato único: JSON Schema em `solver/contrato/semana.schema.json`, espelhado em Pydantic e nos tipos de `lib/solver/contrato.ts`
+- [x] Modelo: variáveis booleanas por cerimônia × dia × slot inicial viável, pré-filtradas por jornada, almoço, dia protegido, duração máxima e janela protegida de cada participante; intervalos opcionais por participante com `AddNoOverlap` por pessoa, estendidos pelo intervalo obrigatório (R3, R5); unicidade e alocação garantida (R1, R2); limites diários (R8, R9); teto semanal com variável de folga até o limite aceitável (R10, camada 3); orçamento mensal pró-rata acumulado (R11)
+- [x] Objetivo ponderado w1 a w8 do §4.1: fragmentação, desvio do alvo, não alocadas, trocas de contexto, desbalanceamento entre pares, instabilidade, fora da faixa preferencial e atraso de SLA. Por perfil, só `pesoFrag` varia por enquanto
+- [ ] Camadas como otimização lexicográfica (sem folga → com troca de cadeira → com folga); hoje as camadas vêm de pesos, com troca de cadeira modelada por candidatos do mesmo cargo e time, e as concessões saem das folgas positivas
+- [ ] Warm start com a solução gulosa (`AddHint`), limite de 60 a 120s e 8 workers estão prontos; falta a decomposição por squad. A 60s por semana, quatro semanas passam dos 3 minutos do critério
+- [x] Comparação guloso × CP-SAT no mesmo cenário (`pnpm solver:comparar`); fallback automático para o guloso em timeout, erro, inviabilidade, violação no validador ou objetivo pior
+- [x] Mesmo `validarPlano` da E02 sobre a saída. Na semana 1 da semente, o CP-SAT chegou a 100% das obrigatórias e do SLA sem concessão (o guloso fez 98,1%, 88,9% e 3), com zero violação, mas parou no limite de 60s com gap de 11,2%
+- [ ] Benchmark em várias sementes para o critério "igual ou melhor que o guloso em 95% dos casos"
 
 **Critérios de aceite.** Horizonte de 4 semanas em menos de 3 minutos (critério 3); objetivo igual ou melhor que o guloso em 95% dos casos de teste; zero violação rígida; SLA de 100% quando viável.
 
@@ -675,10 +676,10 @@ flowchart LR
 
 ### Fase 4 · Inteligência operacional
 
-#### E22 · Simulação de contratação e déficit · ⬜
+#### E22 · Simulação de contratação e déficit · ✅
 
-- [ ] "E se contratar N pessoas no cargo X" e "e se o kickoff não exigir Líder Técnico" (Parte IV.1) como cenários comparáveis
-- [ ] Curva de cobertura por FTE adicional e projeção de três meses com projetos previstos
+- [x] "E se contratar N pessoas no cargo X" e "e se o kickoff não exigir Líder Técnico" (Parte IV.1) como cenários comparáveis: aba Otimizador › E se, com `lib/dominio/contratacao.ts` rodando num worker próprio, sem gravar nada
+- [x] Curva de cobertura por FTE adicional e projeção de três meses com projetos previstos. Na base, três kickoffs novos por mês levam o déficit de 0,6 para 4,3 FTE no terceiro mês. Os previstos ficam na fase de entrada; o pipeline real vem com a E23
 
 #### E23 · Integrações com Tarefas, Projetos e RH · ⬜
 
