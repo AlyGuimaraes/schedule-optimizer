@@ -1,6 +1,7 @@
 import { cookies } from "next/headers"
 
 import { AppSidebar } from "@/components/cadencia/app-sidebar"
+import { AvisoCenario } from "@/components/cadencia/aviso-cenario"
 import { CadenciaProvider } from "@/components/cadencia/cadencia-provider"
 import { DicaFlutuante } from "@/components/cadencia/dica-flutuante"
 import { SiteHeader } from "@/components/cadencia/site-header"
@@ -22,6 +23,7 @@ export default async function AppLayout({
         <AppSidebar />
         <SidebarInset className="min-w-0">
           <SiteHeader />
+          <AvisoCenario />
           {children}
         </SidebarInset>
         <DicaFlutuante />

@@ -7,6 +7,16 @@ import type { DadosMundo, Indices } from "@/lib/dados/mapeador"
 
 export type Cenario = "base" | "otm"
 type Estado = { texto: string; vivo: boolean }
+/** Cenário salvo aplicado ao alternador global (E13): as premissas dele sobre o mundo atual. */
+export type CenarioAtivo = { id: string; nome: string; premissas: Record<string, unknown> }
+
+const CHAVES_SNAPSHOT = ["perfil", "horizonte", "rebalancear", "papeis", "geral", "etapas", "clientes"] as const
+
+function comSnapshot(base: Config, premissas: Record<string, unknown>): Config {
+  const c = { ...base } as unknown as Record<string, unknown>
+  for (const k of CHAVES_SNAPSHOT) if (premissas[k] !== undefined && premissas[k] !== null) c[k] = premissas[k]
+  return c as unknown as Config
+}
 
 interface CadenciaState {
   mundo: Mundo | null
@@ -23,8 +33,11 @@ interface CadenciaState {
   /** muda a cada execução do Otimizar, para o terminal repetir a animação */
   execucao: number
   dadosAtuais: DadosMundo | null
+  cenarioAtivo: CenarioAtivo | null
 
   setCenario: (cenario: Cenario) => void
+  /** troca as premissas do alternador pelas de um cenário salvo; null volta às atuais */
+  aplicarCenario: (c: CenarioAtivo | null) => void
   avisar: (texto: string, duracao?: number) => void
   inicializar: (dados: DadosMundo | null, erro: string | null) => void
   recalcular: (motivo?: string) => Promise<void>
@@ -83,8 +96,16 @@ export const useCadencia = create<CadenciaState>((set, get) => ({
   otimizando: false,
   execucao: 0,
   dadosAtuais: null,
+  cenarioAtivo: null,
 
   setCenario: (cenario) => set({ cenario }),
+
+  aplicarCenario: (c) => {
+    const dados = get().dadosAtuais
+    if (!dados) return
+    set({ cenarioAtivo: c, config: c ? comSnapshot(dados.config, c.premissas) : dados.config, cenario: "otm" })
+    void get().recalcular(c ? `cenário "${c.nome}" aplicado` : "de volta às premissas atuais")
+  },
 
   avisar: (texto, duracao = 2200) => {
     set({ estado: { texto, vivo: true } })
@@ -101,9 +122,13 @@ export const useCadencia = create<CadenciaState>((set, get) => ({
     }
     if (get().dadosAtuais === dados) return
     const atual = get().config
-    const config = atual
-      ? { ...dados.config, horizonte: atual.horizonte, perfil: atual.perfil, rebalancear: atual.rebalancear }
-      : dados.config
+    const ativo = get().cenarioAtivo
+    // com um cenário salvo no alternador, o mundo novo recebe as premissas dele outra vez
+    const config = ativo
+      ? comSnapshot(dados.config, ativo.premissas)
+      : atual
+        ? { ...dados.config, horizonte: atual.horizonte, perfil: atual.perfil, rebalancear: atual.rebalancear }
+        : dados.config
     set({ mundo: dados.mundo, config, indices: dados.indices, erro: null, dadosAtuais: dados })
     void get().recalcular()
   },

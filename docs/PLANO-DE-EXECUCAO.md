@@ -557,7 +557,7 @@ flowchart LR
 **Requisitos.** R24, §2.2, §10, §12.
 
 - [x] Cenário vigente e rascunhos: duplicar o vigente com snapshot das premissas, alterar, executar, comparar lado a lado (indicadores e diff de ocorrências), aplicar, descartar ou manter como alternativo
-- [ ] O alternador global passa a comparar a agenda atual com o cenário ativo, com seletor de cenário
+- [x] O alternador global passa a comparar a agenda atual com o cenário ativo, com seletor de cenário no cabeçalho (premissas atuais ou as de um cenário salvo, aplicadas sobre o mundo atual) e faixa de aviso enquanto um cenário está ativo
 - [x] Estabilidade: termo w6 no custo do solver (`pesoEstabilidade`, 3 por padrão) e indicador Estabilidade do plano (1 − movidas / total), gravado no resumo do cenário
 - [x] Limite de 20% de ocorrências movidas por ciclo como restrição relaxável com registro: acima do limite, `simular` reforça o peso w6 (×3, até três vezes); se nem assim couber, fica a tentativa mais estável com `estabilidade.relaxada`, exibida no Otimizador
 - [x] Âncoras: ocorrência confirmada ou imposta pelo cliente vira restrição rígida; ação de ancorar na Agenda
