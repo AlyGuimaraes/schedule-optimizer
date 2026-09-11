@@ -141,7 +141,7 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 | E00 | Setup do projeto e infraestrutura | 1 Fundação | | 1 | 🟡 falta GitHub e CI |
 | E01 | Design system Cadência | 1 Fundação | E00 | 5 | ⬜ |
 | E02 | Motor de domínio em TypeScript | 1 Fundação | E00 | 5 | 🟡 porte e paridade prontos |
-| E03 | Banco de dados, autenticação e RLS | 1 Fundação | E02 (tipos) | 4 | ⬜ |
+| E03 | Banco de dados, autenticação e RLS | 1 Fundação | E02 (tipos) | 4 | 🟡 esquema, RLS e seed no ar |
 | E04 | Camada de dados e estado da aplicação | 1 Fundação | E02, E03 | 3 | ⬜ |
 | E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | ⬜ |
 | E06 | Tela Time (Pessoas, Times, Cargos) | 1 Fundação | E01, E04 | 4 | ⬜ |
@@ -312,7 +312,7 @@ flowchart LR
 
 **Critérios de aceite.** Paridade de 100% com a semente 7 em todos os cenários listados; cobertura de testes acima de 90% em `lib/dominio/`; worker responde em menos de 200ms no navegador; `validarPlano` sem violações.
 
-#### E03 · Banco de dados, autenticação e RLS · ⬜
+#### E03 · Banco de dados, autenticação e RLS · 🟡
 
 **Objetivo.** Modelo de dados do §9 ampliado com times, cargos e playbook por etapa, com premissas versionadas, auditoria e segurança por papel.
 **Requisitos.** R18, R19, R47, R52, R56, §2.1, §9.
@@ -353,16 +353,18 @@ flowchart LR
 
 **Tarefas**
 
-- [ ] Enums: `health_projeto`, `prioridade_cliente`, `status_cenario`, `status_ocorrencia`, `perfil_otimizacao`, `papel_app`, `escopo_override`, `provedor_calendario`, `tipo_produto`
-- [ ] Checks com os limites da tabela de campos da E07 (por exemplo, `produtivo_min` entre 40 e 95)
-- [ ] Vigência: view `premissas_cargo_vigentes`; função `definir_premissa_cargo()` que fecha a versão anterior e abre a nova com `autor = auth.uid()`
-- [ ] Trigger de auditoria em cadastros, premissas e playbook
-- [ ] RPCs transacionais: `remover_etapa(id, destino)`, `excluir_time(id, destino)`, `salvar_squads(jsonb)`, `carregar_mundo()` (devolve o mundo vigente num jsonb só)
-- [ ] Seed gerado a partir de `lib/dominio/semente.ts` com semente 7: 6 cargos, 20 pessoas, 4 times, 6 etapas, 13 itens de playbook, 112 projetos com squads e prioridades, premissas padrão
-- [ ] O seed precisa passar `montarSquad` em todos os projetos antes de gravar, para corrigir o defeito 15; em seguida, regravar os números de referência da seção 1.3 e o golden da paridade
+- [x] Enums: `health_projeto`, `prioridade_cliente`, `status_cenario`, `status_ocorrencia`, `perfil_otimizacao`, `papel_app`, `escopo_override`, `provedor_calendario`, `tipo_produto`, `origem_alocacao`
+- [x] Checks com os limites da tabela de campos da E07 (por exemplo, `produtivo_min` entre 40 e 95)
+- [x] Vigência: views `premissas_cargo_vigentes` e `premissas_gerais_vigentes`; função `definir_premissa_cargo()` que fecha a versão anterior e abre a nova com `autor = auth.uid()`
+- [x] Trigger de auditoria em cadastros, premissas e playbook, com a função em `security definer`
+- [x] RPCs transacionais: `remover_etapa(id, destino)`, `excluir_time(id, destino)`, `salvar_squads(jsonb)`, `carregar_mundo()` (devolve o mundo vigente num jsonb só)
+- [x] Seed gerado por `scripts/gerar-seed.ts` (`pnpm seed:gerar`) a partir de `lib/dominio/semente.ts` com semente 7: 6 cargos, 20 pessoas, 4 times, 6 etapas, 13 itens de playbook, 95 clientes, 112 projetos, 940 produtos e 266 cadeiras
+- [x] O seed passa `montarSquad` em todos os projetos antes de gravar, o que corrige o defeito 15
+- [ ] Regravar os números de referência da seção 1.3 e o golden da paridade sobre a base com a regra do time aplicada
 - [ ] Auth com Google, restrito ao domínio LeverPro (hook `before-user-created` ou validação no callback); página `/entrar`; `proxy.ts` do Next 16 renovando a sessão com `@supabase/ssr` e protegendo o grupo `(app)`
-- [ ] RLS em todas as tabelas: leitura para autenticados, escrita para gestor e admin via `tem_papel()`, auditoria somente leitura, `agente_execucoes` e `solver_jobs` só com service role
-- [ ] Script `pnpm db:tipos` com `supabase gen types typescript --linked`
+- [x] RLS em todas as tabelas: leitura para autenticados, escrita para gestor e admin via `tem_papel()`, playbook e cargos só para admin, auditoria somente leitura, `agente_execucoes` e `solver_jobs` sem política (só service role)
+- [x] Perfil de usuário criado automaticamente no primeiro acesso, por trigger em `auth.users`
+- [x] Script `pnpm db:tipos` com `supabase gen types typescript --linked`, gerando `lib/dados/tipos-banco.ts`
 - [ ] Testes de integração com `supabase start`: leitor não escreve, RPCs, vigência, restrição de exclusão de cargo
 
 **Critérios de aceite.** `supabase db push` limpo; o seed reproduz os números da seção 1.3 quando carregado no motor; RLS testada; login com Google funcionando em preview.
@@ -785,7 +787,7 @@ Regra: segue-se o protótipo, que é o artefato mais recente, salvo decisão con
    git remote add origin git@github.com:AlyGuimaraes/schedule-optimizer.git && git push -u origin main
    ```
    e `pnpm dlx vercel@latest git connect` para ligar os deploys automáticos.
-2. **Supabase.** Confirmar a cobrança do novo projeto na organização Leverpro; habilitar PITR no go-live.
+2. **Supabase.** Confirmar a cobrança do novo projeto na organização Leverpro; habilitar PITR no go-live. Duas observações de operação: a chave secreta no formato novo (`sb_secret_`) vem **mascarada** pela CLI e só pode ser copiada do painel, então o `.env.local` usa a `service_role` legada; e a migração `20260911000004_dados_demonstracao.sql` carrega a base simulada, que deve ser retirada quando entrarem os dados reais.
 3. **Vercel.** A região gru1 exige plano Pro no time; confirmar no primeiro deploy.
 4. **Anthropic.** Chave de API da LeverPro antes da E18.
 5. **Google Workspace.** Admin para a delegação de domínio antes da E09.
