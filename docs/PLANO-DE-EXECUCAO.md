@@ -68,6 +68,8 @@ O motor do protótipo (L647 a L1509) foi executado em Node, sem navegador, com a
 | Equilíbrio | 75,9% | 78,8% | 75% | 5,10 FTE |
 | Prioridade ao cliente | 75,9% | 78,8% | 80% | 5,10 FTE |
 
+**Atenção ao defeito 15.** Estes números saem da semente como ela está, e nela 55% das cadeiras ignoram o time do projeto. Aplicando a regra do §2.0 (remontando todos os squads com `montarSquad`), o mesmo cenário fica mais apertado e mais honesto: cobertura de 96,6% para **89,7%**, obrigatórias de 98,1% para **94,2%**, adiadas de 2 para **6**, déficit de 0,40 para **0,61 FTE** e horas de 109 para 106. Em compensação, o **SLA de etapa fecha 100%**, porque a cadeira do kickoff que estourava o orçamento mensal passa a ser de outra pessoa. Quando a E03 semear respeitando o time, esta tabela precisa ser regravada, e a decisão D-07 pode se resolver sozinha.
+
 Outros pontos de controle: mudar a Reunião de Trabalho de Construção de 4 para 2 semanas leva a demanda da S1 de **58 para 64**; a Reunião de Trabalho de Discovery responde por **27,9%** da pessoa-hora; as colunas calculadas por cargo batem com a matriz do §2.3 (Analista 33,0 / 5,9 / 7,3; Gerente de Projeto 29,2 / 12,3 / 15,2).
 
 ### 1.4 Arquitetura alvo
@@ -138,7 +140,7 @@ docs/referencia/, docs/PLANO-DE-EXECUCAO.md
 |---|---|---|---|---|---|
 | E00 | Setup do projeto e infraestrutura | 1 Fundação | | 1 | 🟡 falta GitHub e CI |
 | E01 | Design system Cadência | 1 Fundação | E00 | 5 | ⬜ |
-| E02 | Motor de domínio em TypeScript | 1 Fundação | E00 | 5 | ⬜ |
+| E02 | Motor de domínio em TypeScript | 1 Fundação | E00 | 5 | 🟡 porte e paridade prontos |
 | E03 | Banco de dados, autenticação e RLS | 1 Fundação | E02 (tipos) | 4 | ⬜ |
 | E04 | Camada de dados e estado da aplicação | 1 Fundação | E02, E03 | 3 | ⬜ |
 | E05 | Tela Projetos | 1 Fundação | E01, E04 | 3 | ⬜ |
@@ -271,15 +273,15 @@ flowchart LR
 
 **Critérios de aceite.** Vitrine completa; axe sem violações sérias; diferença visual de até 1% por componente contra o protótipo em 1440px, nos dois temas.
 
-#### E02 · Motor de domínio em TypeScript · ⬜
+#### E02 · Motor de domínio em TypeScript · 🟡
 
 **Objetivo.** Portar o motor do protótipo (L647 a L1509) para `lib/dominio/`: puro, tipado, determinístico e com paridade numérica total.
 **Requisitos.** R06, R07, R08, R09, R12, R17, R22, R24, R27, R28, R29, R35, R36, R37, §2, §4, §5.
 
 **Tarefas**
 
-- [ ] `tipos.ts`: `Pessoa`, `Cargo`, `PremissasCargo`, `PremissasGerais`, `Etapa`, `PesosCliente`, `Projeto` (produtos, squad por cargo, time, health, prioridade, mês), `Time`, `ItemPlaybook`, `CerimoniaDemanda`, `CerimoniaAlocada` (dia, slot, relaxada, trocas), `Concessao`, `TrocaCadeira`, `Adiada` (motivo), `Deficit`, `Cobertura`, `KpiPessoa`, `KpiCenario`, `ResultadoSemana`, `Simulacao`, `Perfil`, `Config`, `Mundo`
-- [ ] Portar função a função, sem mudar comportamento:
+- [x] `tipos.ts`: `Pessoa`, `Cargo`, `PremissasCargo`, `PremissasGerais`, `Etapa`, `PesosCliente`, `Projeto` (produtos, squad por cargo, time, health, prioridade, mês), `Time`, `ItemPlaybook`, `CerimoniaDemanda`, `CerimoniaAlocada` (dia, slot, relaxada, trocas), `Concessao`, `TrocaCadeira`, `Adiada` (motivo), `Deficit`, `Cobertura`, `KpiPessoa`, `KpiCenario`, `ResultadoSemana`, `Simulacao`, `Perfil`, `Config`, `Mundo`
+- [x] Portar função a função, sem mudar comportamento:
 
 | Protótipo | Módulo |
 |---|---|
@@ -297,15 +299,16 @@ flowchart LR
 | `analiseCapacidade` | `capacidade.ts` |
 | `simular` | `simulacao.ts` |
 
-- [ ] Eliminar o estado global: `PLAYBOOK` e `FASES` passam a fazer parte do `Mundo`, e nenhuma função muta a entrada
-- [ ] Unidades: o banco guarda minutos; o motor trabalha em slots de 30 minutos (os campos `duracaoMax`, `blocoFocoMin` e `focoProt` do protótipo já estão em slots); a conversão fica no mapeador da E04
-- [ ] Paridade: `scripts/prototipo/extrair-motor.mjs` extrai o bloco do HTML e o executa em `vm`; `tests/paridade/` compara o JSON completo (demanda, alocação por dia e slot, concessões, trocas, adiadas com motivo, déficit, KPIs por pessoa, mês) nos cenários: 4 perfis × horizontes 2, 4, 6 e 8; alvos +7 p.p.; recorrência de Construção em 2 semanas; saída de pessoa; cargo novo; etapa nova
-- [ ] Os números da seção 1.3 como asserts explícitos
-- [ ] Atenção: `agendarBaseline` embaralha com `sort(() => rnd() - 0.5)` (L1151), que depende do algoritmo de ordenação do V8. Manter igual para travar a paridade; depois trocar por Fisher-Yates num commit separado e regravar o golden
+- [x] Eliminar o estado global: `PLAYBOOK` e `FASES` passam a fazer parte do `Mundo`, e nenhuma função muta a entrada
+- [x] Unidades: o banco guarda minutos; o motor trabalha em slots de 30 minutos (os campos `duracaoMax`, `blocoFocoMin` e `focoProt` do protótipo já estão em slots); a conversão fica no mapeador da E04
+- [x] Paridade: `tests/paridade/prototipo.ts` extrai o bloco do HTML e o executa em `vm`, num contexto novo por cenário; `tests/paridade/motor.test.ts` compara o recorte completo (demanda, alocação por dia e slot, concessões, trocas, adiadas com motivo, déficit, cobertura, KPIs por pessoa, mês) em 10 cenários: os 4 perfis, horizontes 2, 4 e 8, alvos +7 p.p. com equilíbrio e com foco, sem rebalanceamento e recorrência de Construção quinzenal
+- [ ] Ampliar a paridade para as operações de edição (saída de pessoa, cargo novo, etapa nova) junto com o `edicao.ts`, na E05 e E06
+- [x] Os números da seção 1.3 como asserts explícitos
+- [x] Atenção: `agendarBaseline` embaralha com `sort(() => rnd() - 0.5)` (L1151), que depende do algoritmo de ordenação do V8. Mantido igual para travar a paridade; a troca por Fisher-Yates entra num commit separado, com o golden regravado
 - [ ] Depois da paridade travada, corrigir os defeitos de domínio da seção 6, um commit e um teste por defeito
 - [ ] `workers/motor.worker.ts`: mensagem `{ mundo, config }` devolve `Simulacao`; cancelamento da execução anterior quando chega uma nova
-- [ ] Validador independente `validarPlano()` que confere as restrições rígidas R1 a R13 do §4.1 sobre qualquer resultado, usado pelo guloso e pelo CP-SAT
-- [ ] Benchmark: 112 projetos, 20 pessoas, 8 semanas em menos de 150ms em Node
+- [x] Validador independente `validarPlano()` que confere as restrições rígidas R1 a R13 do §4.1 sobre qualquer resultado, usado pelo guloso e pelo CP-SAT; a checagem da regra de time (§2.0) é opcional por causa do defeito 15
+- [x] Benchmark: 112 projetos, 20 pessoas, horizonte de 4 semanas em 49ms e de 8 semanas abaixo de 1s, com teste de regressão
 
 **Critérios de aceite.** Paridade de 100% com a semente 7 em todos os cenários listados; cobertura de testes acima de 90% em `lib/dominio/`; worker responde em menos de 200ms no navegador; `validarPlano` sem violações.
 
@@ -356,6 +359,7 @@ flowchart LR
 - [ ] Trigger de auditoria em cadastros, premissas e playbook
 - [ ] RPCs transacionais: `remover_etapa(id, destino)`, `excluir_time(id, destino)`, `salvar_squads(jsonb)`, `carregar_mundo()` (devolve o mundo vigente num jsonb só)
 - [ ] Seed gerado a partir de `lib/dominio/semente.ts` com semente 7: 6 cargos, 20 pessoas, 4 times, 6 etapas, 13 itens de playbook, 112 projetos com squads e prioridades, premissas padrão
+- [ ] O seed precisa passar `montarSquad` em todos os projetos antes de gravar, para corrigir o defeito 15; em seguida, regravar os números de referência da seção 1.3 e o golden da paridade
 - [ ] Auth com Google, restrito ao domínio LeverPro (hook `before-user-created` ou validação no callback); página `/entrar`; `proxy.ts` do Next 16 renovando a sessão com `@supabase/ssr` e protegendo o grupo `(app)`
 - [ ] RLS em todas as tabelas: leitura para autenticados, escrita para gestor e admin via `tem_papel()`, auditoria somente leitura, `agente_execucoes` e `solver_jobs` só com service role
 - [ ] Script `pnpm db:tipos` com `supabase gen types typescript --linked`
@@ -740,6 +744,7 @@ flowchart LR
 | 12 | SLA de etapa em 88,9% no cenário padrão: o orçamento mensal pró-rata da S1 bloqueia um kickoff | motor, L1326 | E12 |
 | 13 | "Restaurar padrões" da aba Por cargo também restaura Gerais, Urgência e Clientes | L3618 | E07 |
 | 14 | Tema mantido só em memória (Parte IV.5) | L3750 | ✅ next-themes; perfil na E03 |
+| 15 | **A semente monta squads com gente de fora do time.** `construirMundo` sorteia as cadeiras por cargo usando o quadro inteiro, sem filtrar pelos membros do time; só `montarSquad` e `rebalancearAlocacao` respeitam a regra. Na semente 7 são **146 das 266 cadeiras (55%), em 94 dos 112 projetos**, o que torna a regra do §2.0 inócua na base simulada | L925 a L942 | E03 (seed) |
 
 ## 7. Divergências entre especificação e protótipo
 

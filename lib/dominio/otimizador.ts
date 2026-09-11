@@ -1,0 +1,329 @@
+import { almoco, livre, marcar, novaOcupacao } from "./disponibilidade"
+import { DIAS, GERAL_PADRAO, PERFIS } from "./padroes"
+import { geralDe, premDe } from "./premissas"
+import { membrosDoTime } from "./times"
+import type {
+  Cerimonia,
+  Concessao,
+  Config,
+  Deficit,
+  Health,
+  Mundo,
+  Ocupacao,
+  Papel,
+  Pessoa,
+  PremissasGerais,
+  ResultadoOtimizacao,
+  TrocaCadeira,
+} from "./tipos"
+
+/** Penalidade de fragmentação do dia: tempo livre que não forma bloco de foco (§5). */
+export function custoDia(
+  oc: Ocupacao,
+  p: number,
+  d: number,
+  blocoMin: number,
+  G: PremissasGerais = GERAL_PADRAO
+): { penal: number; foco: number; livres: number } {
+  let blocos = 0
+  let foco = 0
+  let livres = 0
+  let run = 0
+  for (let t = G.inicio; t < G.fim; t++) {
+    if (almoco(G, t)) {
+      if (run >= blocoMin) foco += run
+      if (run > 0) blocos++
+      run = 0
+      continue
+    }
+    if (oc[p][d][t] === null) {
+      run++
+      livres++
+    } else {
+      if (run >= blocoMin) foco += run
+      if (run > 0) blocos++
+      run = 0
+    }
+  }
+  if (run >= blocoMin) foco += run
+  if (run > 0) blocos++
+  return { penal: livres - foco + blocos * 0.5, foco, livres }
+}
+
+/**
+ * Solver em três camadas (§4.3):
+ *   1. tudo dentro da premissa alvo
+ *   2. rebalanceamento de cadeira, ainda dentro do alvo
+ *   3. relaxamento controlado, só para cerimônia obrigatória e dentro da tolerância
+ * O que não couber vira déficit estrutural em FTE por cargo.
+ */
+export function otimizar(
+  demanda: Cerimonia[],
+  pessoas: Pessoa[],
+  cfg: Config,
+  mundo?: Mundo
+): ResultadoOtimizacao {
+  const n = pessoas.length
+  const oc = novaOcupacao(n)
+  const PP = pessoas.map((p) => premDe(cfg, p.papel))
+  const PF = PERFIS[cfg.perfil] || PERFIS.equilibrio
+  const G = geralDe(cfg)
+  const pref = new Set(G.preferidos)
+  const acum = cfg.acumulado || new Array<number>(n).fill(0)
+  const semanaIdx = cfg.semanaIdx || 1
+  const tetoMes = (p: number) => (PP[p].maxHorasMes * semanaIdx) / 4.33
+  const carga = new Array<number>(n).fill(0)
+  const porDia = Array.from({ length: n }, () => new Array<number>(DIAS).fill(0))
+  const hDia = Array.from({ length: n }, () => new Array<number>(DIAS).fill(0))
+  const alocadas: Cerimonia[] = []
+  const concessoes: Concessao[] = []
+
+  // nível 0 = premissa alvo; nível 1 = o máximo que o perfil autoriza ceder
+  const tetoEf = (p: number, r: boolean) =>
+    r ? PP[p].teto + (PP[p].tetoMax - PP[p].teto) * PF.usaTolerancia : PP[p].teto
+  const reunEf = (p: number, r: boolean) => PP[p].maxReunioesDia + (r ? PF.extraReunioes : 0)
+  const horasEf = (p: number, r: boolean) => PP[p].maxHorasDia + (r ? PF.extraHoras : 0)
+  const janelaEf = (p: number, r: boolean) =>
+    r && PF.cedeJanela ? Math.max(0, PP[p].focoProt - 2) : PP[p].focoProt
+  const durEf = (p: number, r: boolean) => PP[p].duracaoMax + (r ? PF.extraDuracao : 0)
+
+  // toda restrição de cargo é avaliada participante a participante, e a mais restritiva vence (§4.2)
+  function viavel(parts: number[], d: number, s: number, slots: number, h: number, r: boolean) {
+    for (const p of parts) {
+      if (s < Math.max(G.inicio, janelaEf(p, r))) return false
+      if (slots > durEf(p, r)) return false
+      if (!livre(oc, p, d, s, slots, G, true)) return false
+      if (porDia[p][d] + 1 > reunEf(p, r)) return false
+      if (hDia[p][d] + h > horasEf(p, r) + 1e-9) return false
+    }
+    return true
+  }
+
+  function custo(parts: number[], d: number, s: number, slots: number, ev?: Cerimonia) {
+    let c = 0
+    parts.forEach((p) => {
+      const antes = custoDia(oc, p, d, PP[p].blocoFocoMin, G).penal
+      for (let i = 0; i < slots; i++) oc[p][d][s + i] = -1
+      const depois = custoDia(oc, p, d, PP[p].blocoFocoMin, G).penal
+      for (let i = 0; i < slots; i++) oc[p][d][s + i] = null
+      c += (depois - antes) * PF.pesoFrag
+      for (let i = 0; i < slots; i++) if (!pref.has(s + i)) c += G.pesoPreferencia
+      c += porDia[p][d] === 0 ? 1.2 : 0.3 * porDia[p][d]
+      const folga = PP[p].teto - carga[p]
+      c += folga <= 0 ? 2.5 : Math.max(0, 1.4 - folga)
+    })
+    if (PF.ancorar && ev && d !== ev.projetoId % DIAS) c += 2.2
+    // cerimônia com prazo curto é puxada para o começo da semana e do dia
+    const urg = ev && ev.sla ? 2.4 : 0.02
+    return c + s * (ev && ev.sla ? 0.06 : 0.01) + d * urg
+  }
+
+  function melhorSlot(parts: number[], slots: number, h: number, r: boolean, ev?: Cerimonia) {
+    let m: { d: number; s: number; custo: number } | null = null
+    for (let d = 0; d < DIAS; d++)
+      for (let s = G.inicio; s + slots <= G.fim; s++) {
+        if (!viavel(parts, d, s, slots, h, r)) continue
+        const c = custo(parts, d, s, slots, ev)
+        if (m === null || c < m.custo) m = { d, s, custo: c }
+      }
+    return m
+  }
+
+  /** Cada concessão vira registro auditável: pessoa, premissa, valor alvo e valor aplicado. */
+  function registrar(ev: Cerimonia, parts: number[], d: number, s: number, h: number) {
+    parts.forEach((p) => {
+      const c = PP[p]
+      const nome = pessoas[p].nome
+      const cedidas: { premissa: string; alvo: number; valor: number; un: string }[] = []
+      if (carga[p] + h > c.teto + 1e-9)
+        cedidas.push({ premissa: "teto de reunião", alvo: c.teto, valor: carga[p] + h, un: "h" })
+      if (porDia[p][d] + 1 > c.maxReunioesDia)
+        cedidas.push({ premissa: "máx. reuniões/dia", alvo: c.maxReunioesDia, valor: porDia[p][d] + 1, un: "" })
+      if (hDia[p][d] + h > c.maxHorasDia + 1e-9)
+        cedidas.push({ premissa: "máx. horas/dia", alvo: c.maxHorasDia, valor: hDia[p][d] + h, un: "h" })
+      if (s < c.focoProt)
+        cedidas.push({ premissa: "janela protegida", alvo: c.focoProt / 2, valor: s / 2, un: "h" })
+      if (ev.slots > c.duracaoMax)
+        cedidas.push({ premissa: "duração máx. da reunião", alvo: c.duracaoMax / 2, valor: ev.slots / 2, un: "h" })
+      cedidas.forEach((x) =>
+        concessoes.push({
+          pessoa: nome,
+          pessoaId: p,
+          papel: pessoas[p].papel,
+          projeto: ev.projeto,
+          cerimonia: ev.tipo,
+          ...x,
+        })
+      )
+    })
+  }
+
+  function confirmar(ev: Cerimonia, m: { d: number; s: number }, relaxado: boolean) {
+    const h = ev.dur / 60
+    if (relaxado) registrar(ev, ev.participantes, m.d, m.s, h)
+    marcar(oc, ev, m.d, m.s)
+    ev.relaxado = !!relaxado
+    ev.participantes.forEach((p) => {
+      carga[p] += h
+      porDia[p][m.d]++
+      hDia[p][m.d] += h
+    })
+    alocadas.push(ev)
+  }
+
+  // fila: prioridade da cerimônia corrigida pela urgência da etapa e pelo peso do cliente
+  const risco: Record<Health, number> = { vermelho: 0, amarelo: 1, verde: 2 }
+  const pesoUrg = PF.fila === "criticidade" ? 0.55 : 0.22
+  const rank = (ev: Cerimonia) =>
+    ev.prio -
+    pesoUrg * ((ev.score || 4) / 3) -
+    (PF.fila === "criticidade" ? (2 - risco[ev.health]) * 0.3 : 0)
+  const ordem = [...demanda].sort(
+    (a, b) =>
+      rank(a) - rank(b) || b.participantes.length - a.participantes.length || b.dur - a.dur
+  )
+
+  // ---- camada 1: tudo dentro da premissa alvo ----
+  const sobra1: Cerimonia[] = []
+  ordem.forEach((ev) => {
+    const h = ev.dur / 60
+    if (
+      ev.participantes.some(
+        (p) =>
+          carga[p] + h > tetoEf(p, false) + 1e-9 ||
+          acum[p] + carga[p] + h > tetoMes(p) + 1e-9
+      )
+    ) {
+      sobra1.push(ev)
+      return
+    }
+    const m = melhorSlot(ev.participantes, ev.slots, h, false, ev)
+    if (m) confirmar(ev, m, false)
+    else sobra1.push(ev)
+  })
+
+  // ---- camada 2: troca de cadeira por outro do mesmo cargo com folga ----
+  const trocas: { ev: Cerimonia; subs: TrocaCadeira[] }[] = []
+  const sobra2: Cerimonia[] = []
+  if (cfg.rebalancear !== false) {
+    const porPapel: Record<Papel, number[]> = {}
+    pessoas.forEach((p) => {
+      ;(porPapel[p.papel] = porPapel[p.papel] || []).push(p.id)
+    })
+    const elegiveisDe = (ev: Cerimonia) => (mundo ? membrosDoTime(mundo, ev.timeId) : null)
+    sobra1.forEach((ev) => {
+      const h = ev.dur / 60
+      const novos = ev.participantes.slice()
+      const subs: TrocaCadeira[] = []
+      ev.participantes.forEach((pid, i) => {
+        if (carga[pid] + h <= PP[pid].teto + 1e-9 && acum[pid] + carga[pid] + h <= tetoMes(pid) + 1e-9)
+          return
+        const eleg = elegiveisDe(ev)
+        const alt = (porPapel[ev.papeis[i]] || [])
+          .filter(
+            (x) =>
+              novos.indexOf(x) < 0 &&
+              (!eleg || eleg.indexOf(x) >= 0) &&
+              carga[x] + h <= PP[x].teto - 0.3 &&
+              acum[x] + carga[x] + h <= tetoMes(x) + 1e-9
+          )
+          .sort((a, b) => carga[a] / PP[a].teto - carga[b] / PP[b].teto)[0]
+        if (alt !== undefined) {
+          subs.push({ de: pid, para: alt, papel: ev.papeis[i] })
+          novos[i] = alt
+        }
+      })
+      if (
+        !subs.length ||
+        novos.some(
+          (p) => carga[p] + h > PP[p].teto + 1e-9 || acum[p] + carga[p] + h > tetoMes(p) + 1e-9
+        )
+      ) {
+        sobra2.push(ev)
+        return
+      }
+      const cand: Cerimonia = { ...ev, participantes: novos }
+      const m = melhorSlot(novos, cand.slots, h, false, cand)
+      if (m) {
+        cand.trocas = subs
+        confirmar(cand, m, false)
+        trocas.push({ ev: cand, subs })
+      } else sobra2.push(ev)
+    })
+  } else sobra1.forEach((ev) => sobra2.push(ev))
+
+  // ---- camada 3: relaxamento controlado, só para cerimônia obrigatória ----
+  const adiadas: Cerimonia[] = []
+  sobra2
+    .sort((a, b) => a.prio - b.prio)
+    .forEach((ev) => {
+      const h = ev.dur / 60
+      if (!ev.obrig) {
+        adiadas.push({ ...ev, motivo: "opcional · sem folga no alvo" })
+        return
+      }
+      if (ev.participantes.some((p) => acum[p] + carga[p] + h > tetoMes(p) + 1e-9)) {
+        adiadas.push({ ...ev, motivo: "excede o teto mensal do cargo" })
+        return
+      }
+      if (ev.participantes.some((p) => carga[p] + h > tetoEf(p, true) + 1e-9)) {
+        adiadas.push({ ...ev, motivo: "excede o limite semanal aceitável" })
+        return
+      }
+      const m = melhorSlot(ev.participantes, ev.slots, h, true, ev)
+      if (m) confirmar(ev, m, true)
+      else adiadas.push({ ...ev, motivo: "sem janela viável nem com tolerância" })
+    })
+
+  // ---- residual: o que não coube vira déficit estrutural em FTE por cargo ----
+  const deficit: Record<Papel, Deficit> = {}
+  adiadas.forEach((ev) =>
+    ev.papeis.forEach((pp) => {
+      deficit[pp] = deficit[pp] || { horas: 0, cerimonias: 0, obrigatorias: 0, fte: 0, horasObrig: 0, fteObrig: 0 }
+      deficit[pp].horas += ev.dur / 60
+      deficit[pp].cerimonias++
+      if (ev.obrig) deficit[pp].obrigatorias++
+    })
+  )
+  adiadas.forEach((ev) => {
+    if (ev.obrig)
+      ev.papeis.forEach((pp) => {
+        deficit[pp].horasObrig = (deficit[pp].horasObrig || 0) + ev.dur / 60
+      })
+  })
+  Object.keys(deficit).forEach((pp) => {
+    const c = premDe(cfg, pp)
+    deficit[pp].horasObrig = deficit[pp].horasObrig || 0
+    deficit[pp].fte = c.teto > 0 ? +(deficit[pp].horas / c.teto).toFixed(2) : 0
+    deficit[pp].fteObrig = c.teto > 0 ? +(deficit[pp].horasObrig / c.teto).toFixed(2) : 0
+  })
+
+  const slaTotal = demanda.filter((x) => x.sla).length
+  const slaAloc = alocadas.filter((x) => x.sla).length
+  const slaViolado = adiadas.filter((x) => x.sla)
+  const obrigTotal = demanda.filter((x) => x.obrig).length
+  const obrigAloc = alocadas.filter((x) => x.obrig).length
+  const cobertura = {
+    total: demanda.length ? +((alocadas.length / demanda.length) * 100).toFixed(1) : 100,
+    obrigatoria: obrigTotal ? +((obrigAloc / obrigTotal) * 100).toFixed(1) : 100,
+    relaxadas: alocadas.filter((x) => x.relaxado).length,
+    sla: slaTotal ? +((slaAloc / slaTotal) * 100).toFixed(1) : 100,
+    slaTotal,
+    slaViolado,
+  }
+
+  return {
+    oc,
+    alocadas,
+    adiadas,
+    trocas,
+    concessoes,
+    deficit,
+    cobertura,
+    carga,
+    acum,
+    PP,
+    perfil: PF,
+    perfilId: cfg.perfil,
+  }
+}
