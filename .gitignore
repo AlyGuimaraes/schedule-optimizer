@@ -35,3 +35,10 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# solver python (E15)
+solver/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
