@@ -411,7 +411,7 @@ flowchart LR
 - [x] Trocar a fase recompõe os cargos do squad; trocar o time zera o squad
 - [x] **Corrigir o defeito 1 da seção 6**: o time selecionado no modal precisa aparecer e ser salvo
 - [x] Confirmação de exclusão com a consequência (produtos e etapa)
-- [x] Testes E2E: criar, editar com troca de fase e de time, excluir (`e2e/projetos-crud.spec.ts`, com limpeza no final). A suíte `pnpm e2e` tem 25 testes: navegação, fluxos de leitura, axe e este cadastro; roda com o Chrome da máquina, e no CI depende dos segredos do Supabase
+- [x] Testes E2E: criar, editar com troca de fase e de time, excluir (`e2e/projetos-crud.spec.ts`, com limpeza no final). A suíte `pnpm e2e` tem 26 testes: navegação, fluxos de leitura, axe, este cadastro e a importação de `.ics` com limpeza; roda com o Chrome da máquina, e no CI depende dos segredos do Supabase
 
 **Critérios de aceite.** Números iguais ao motor; o squad respeita o time (§2.0); os fluxos passam no E2E.
 
