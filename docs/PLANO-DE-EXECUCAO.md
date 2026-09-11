@@ -388,8 +388,8 @@ flowchart LR
 - [ ] Cliente Supabase da sessão (servidor e navegador, `@supabase/ssr`) e repositórios por agregado para as mutações; entra junto com o login da E03 e a primeira tela com edição (E05)
 - [x] Carregamento do mundo no layout do grupo `(app)` via `carregar_mundo()`, deduplicado por requisição com `cache` do React (151ms para carregar, 16ms para simular). O projeto não habilita Cache Components; a revalidação por tag entra com as mutações
 - [x] Store (Zustand) em `lib/estado/cadencia.ts` com mundo, config, índices, cenário atual × otimizado, simulação, tempo do solver e linha de estado
-- [ ] Filtros e abas na URL com `nuqs` (`?aba=`, `?escala=`, `?pessoas=`, `?clientes=`) para links compartilháveis
-- [ ] Ciclo de edição: atualização otimista → worker recalcula (debounce de 300ms nas células, como o `recalculoAdiado` do protótipo) → linha de estado "recalculando" e depois "solver N ms" → server action persiste → em erro, desfaz e mostra a mensagem no rodapé do modal (§14.8)
+- [x] Filtros e abas na URL (`?aba=`, `?escala=`, `?semana=`, `?pessoas=`, `?clientes=`) para links compartilháveis, com os hooks `useParametro` e `useListaParametro` de `lib/estado/url.ts` no lugar do `nuqs`
+- [x] Ciclo de edição: atualização otimista → worker recalcula (debounce de 300ms nas células, como o `recalculoAdiado` do protótipo) → linha de estado "recalculando" e depois "solver N ms" → server action persiste (`persistirAdiado`) → em erro, a mensagem aparece no rodapé do modal ou na linha de estado (§14.8)
 - [x] Rodapé do rail e linha de estado com números reais: perfil, cerimônias por semana, projetos e pessoas
 - [x] Botão Otimizar: vai para o Otimizador, pausa mínima de 620ms, recalcula e avisa "plano recalculado, solver N ms"; o esqueleto e a animação do terminal entram com a tela, na E12
 - [x] `pnpm db:verificar`: verificação de ponta a ponta contra o banco real, com `validarPlano` e a regra do time ligada
@@ -749,21 +749,21 @@ flowchart LR
 
 | # | Defeito | Onde | Etapa |
 |---|---|---|---|
-| 1 | O modal de projeto lê `estado.timeId`, variável que não existe (resolve para o elemento `#estado`), então nunca pré-seleciona o time; `lerRascunhoProjeto` não lê o campo e `salvarProjeto` não recebe `timeId`, então trocar o time não persiste | L2944, L3476, L3729 | E05 |
-| 2 | Excluir time não executa: `executarConfirmacao` tem um bloco `if (c.tipo === 'time')` duplicado, copiado da montagem do modal, que retorna antes do bloco certo | L3241 a L3250 | E06 |
-| 3 | Excluir cargo apaga as premissas mas deixa o cargo no playbook e nos squads; as cerimônias passam a exigir um cargo inexistente | L3233 | E06, E07 |
-| 4 | A aba Trocas de cadeira mostra só a primeira substituição de cada cerimônia | L2147 | E12 |
-| 5 | Cores inexistentes usadas como texto: `var(--warn)` e `var(--accent)` (caem no valor herdado sem aviso) | L2018, L2113, L2138, L2400, L2563, L2734 | E01 |
-| 6 | Gráficos pedem a fonte "Geist", que não é carregada | L1628, L1646, L1648 | E01 |
-| 7 | Baseline embaralhada com `sort(() => rnd() - 0.5)`: viés e dependência do motor JavaScript | L1151 | E02 |
+| 1 | O modal de projeto lê `estado.timeId`, variável que não existe (resolve para o elemento `#estado`), então nunca pré-seleciona o time; `lerRascunhoProjeto` não lê o campo e `salvarProjeto` não recebe `timeId`, então trocar o time não persiste | L2944, L3476, L3729 | E05 ✅ |
+| 2 | Excluir time não executa: `executarConfirmacao` tem um bloco `if (c.tipo === 'time')` duplicado, copiado da montagem do modal, que retorna antes do bloco certo | L3241 a L3250 | E06 ✅ |
+| 3 | Excluir cargo apaga as premissas mas deixa o cargo no playbook e nos squads; as cerimônias passam a exigir um cargo inexistente | L3233 | E06, E07 ✅ |
+| 4 | A aba Trocas de cadeira mostra só a primeira substituição de cada cerimônia | L2147 | E12 ✅ |
+| 5 | Cores inexistentes usadas como texto: `var(--warn)` e `var(--accent)` (caem no valor herdado sem aviso) | L2018, L2113, L2138, L2400, L2563, L2734 | E01 ✅ |
+| 6 | Gráficos pedem a fonte "Geist", que não é carregada | L1628, L1646, L1648 | E01 ✅ |
+| 7 | Baseline embaralhada com `sort(() => rnd() - 0.5)`: viés e dependência do motor JavaScript | L1151 | E02, mantido de propósito: a baseline simula a agenda atual e a paridade com o protótipo depende dele; sai quando a agenda importada (E09) substituir a baseline |
 | 8 | Cadência calculada por `(projeto.id + semana) % cada`, sem datas reais | L985, L1434 | E14 ✅ |
-| 9 | A visão semanal da Agenda mostra só a semana 1 do horizonte | L1840 | E11 |
-| 10 | Listas cortadas em 20 ou 24 itens sem aviso (projetos da pessoa, carga por pessoa) | L1988, L2024 | E11 |
-| 11 | Ids de pessoa são índices de array e são renumerados a cada exclusão | L1069 | E03, E04 |
-| 12 | SLA de etapa em 88,9% no cenário padrão: o orçamento mensal pró-rata da S1 bloqueia um kickoff | motor, L1326 | E12 |
-| 13 | "Restaurar padrões" da aba Por cargo também restaura Gerais, Urgência e Clientes | L3618 | E07 |
+| 9 | A visão semanal da Agenda mostra só a semana 1 do horizonte | L1840 | E11 ✅ |
+| 10 | Listas cortadas em 20 ou 24 itens sem aviso (projetos da pessoa, carga por pessoa) | L1988, L2024 | E11 ✅ (listas inteiras em regiões com rolagem, sem corte) |
+| 11 | Ids de pessoa são índices de array e são renumerados a cada exclusão | L1069 | E03, E04 ✅ (uuids no banco; índices só dentro do motor, com o caminho de volta em `Indices`) |
+| 12 | SLA de etapa em 88,9% no cenário padrão: o orçamento mensal pró-rata da S1 bloqueia um kickoff | motor, L1326 | E12 ✅ (D-07) |
+| 13 | "Restaurar padrões" da aba Por cargo também restaura Gerais, Urgência e Clientes | L3618 | E07 ✅ |
 | 14 | Tema mantido só em memória (Parte IV.5) | L3750 | ✅ next-themes; perfil na E03 |
-| 15 | **A semente monta squads com gente de fora do time.** `construirMundo` sorteia as cadeiras por cargo usando o quadro inteiro, sem filtrar pelos membros do time; só `montarSquad` e `rebalancearAlocacao` respeitam a regra. Na semente 7 são **146 das 266 cadeiras (55%), em 94 dos 112 projetos**, o que torna a regra do §2.0 inócua na base simulada | L925 a L942 | E03 (seed) |
+| 15 | **A semente monta squads com gente de fora do time.** `construirMundo` sorteia as cadeiras por cargo usando o quadro inteiro, sem filtrar pelos membros do time; só `montarSquad` e `rebalancearAlocacao` respeitam a regra. Na semente 7 são **146 das 266 cadeiras (55%), em 94 dos 112 projetos**, o que torna a regra do §2.0 inócua na base simulada | L925 a L942 | E03 (seed) ✅ |
 
 ## 7. Divergências entre especificação e protótipo
 

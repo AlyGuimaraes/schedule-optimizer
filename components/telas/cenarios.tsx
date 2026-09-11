@@ -350,7 +350,7 @@ export function AbaCenarios() {
                   </tr>
                 </thead>
                 <tbody>
-                  {diff.porPessoa.slice(0, 20).map((p) => (
+                  {diff.porPessoa.map((p) => (
                     <tr key={p.nome}>
                       <td>{p.nome}</td>
                       <td className="n">{p.novas}</td>

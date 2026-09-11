@@ -11,6 +11,8 @@ const seguranca = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // raiz fixa: com o pnpm-workspace.yaml, o Turbopack às vezes inferia a pasta errada e o dev caía
+  turbopack: { root: __dirname },
   async headers() {
     return [{ source: "/:path*", headers: seguranca }]
   },
