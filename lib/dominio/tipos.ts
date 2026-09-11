@@ -151,6 +151,26 @@ export interface Config {
   modificadores?: boolean
   /** Exceções por pessoa (§2.1), pelo índice da pessoa: o nível mais específico vence o cargo. */
   excecoesPessoa?: Record<number, Partial<PremissasCargoEntrada>>
+  /** Fração máxima de cerimônias movidas por ciclo (§2.2), só com plano vigente; 0,2 por padrão. */
+  limiteMovidas?: number
+  /** Datas reais do horizonte. Ausente, o motor usa a semana abstrata do protótipo. */
+  calendario?: Calendario
+}
+
+/** Horizonte ancorado no calendário (E14): cadência real, ausências, feriados e antecedência. */
+export interface Calendario {
+  /** segunda-feira (AAAA-MM-DD) que abre o horizonte */
+  inicio: string
+  /** semana absoluta da semana 1 do horizonte */
+  semana0: number
+  /** semana absoluta em que cada série começou, por `projeto|cerimônia` */
+  inicioSerie?: Record<string, number>
+  /** posições da semana 1 (dia × slots por dia + slot) congeladas pela antecedência de 48h */
+  congeladoAte?: number
+  /** ausências e feriados: semana do horizonte → pessoa → dia → motivo */
+  indisponivel?: Record<number, Record<number, Record<number, string>>>
+  /** feriados: semana do horizonte → dia → nome */
+  feriados?: Record<number, Record<number, string>>
 }
 
 export interface TrocaCadeira {
@@ -192,6 +212,8 @@ export interface Cerimonia {
   movida?: boolean
   /** modificador automático que gerou ou alterou a cerimônia */
   origem?: string
+  /** ficou no lugar do plano vigente por estar a menos de 48h (§2.2) */
+  congelada?: boolean
 }
 
 export interface Concessao {
@@ -295,7 +317,15 @@ export interface ResultadoOtimizacao {
   perfilId: PerfilId
   kpi?: KpiCenario
   /** só com plano vigente: quantas cerimônias comparáveis saíram do lugar (§6, estabilidade do plano) */
-  estabilidade?: { comparaveis: number; movidas: number; pct: number }
+  estabilidade?: {
+    comparaveis: number
+    movidas: number
+    pct: number
+    /** o limite de movidas por ciclo não coube nem reforçando o peso: restrição relaxada, registrada */
+    relaxada?: boolean
+    /** peso de estabilidade que produziu este plano, quando o limite exigiu reforço */
+    peso?: number
+  }
 }
 
 export interface SemanaSimulada {

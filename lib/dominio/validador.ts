@@ -1,4 +1,6 @@
+import { posicaoNaSemana } from "./calendario"
 import { almoco, diaBloqueado } from "./disponibilidade"
+import { chaveOcorrencia } from "./otimizador"
 import { DIAS, PERFIS } from "./padroes"
 import { geralDe, premDe } from "./premissas"
 import type { Cerimonia, Config, Mundo, Pessoa, ResultadoOtimizacao } from "./tipos"
@@ -142,6 +144,27 @@ export function validarPlano(
     if (acum[p.id] + horasSemana[p.id] > orcamento + 1e-9)
       v.push({ regra: "R11", descricao: "acumulado acima do orçamento mensal pró-rata", pessoa: p.nome, valor: acum[p.id] + horasSemana[p.id], limite: orcamento })
   })
+
+  // Ausências e feriados (E14): ninguém é convocado num dia em que está fora
+  const indisp = cfg.calendario?.indisponivel?.[semanaIdx]
+  if (indisp)
+    resultado.alocadas.forEach((ev) =>
+      ev.participantes.forEach((p) => {
+        const motivo = indisp[p]?.[ev.dia as number]
+        if (motivo)
+          v.push({ regra: "§2.1", descricao: `convocada num dia de ausência (${motivo})`, pessoa: nome(p), cerimonia: ev.tipo })
+      })
+    )
+
+  // Antecedência de 48h (§2.2): na janela congelada só fica o que já estava no plano vigente
+  const congelado = semanaIdx === 1 ? (cfg.calendario?.congeladoAte ?? 0) : 0
+  if (congelado > 0)
+    resultado.alocadas.forEach((ev) => {
+      if (ev.ancorada || posicaoNaSemana(ev.dia as number, ev.slot as number) >= congelado) return
+      const v0 = cfg.planoVigente?.[chaveOcorrencia(ev, semanaIdx)]
+      if (!v0 || v0.dia !== ev.dia || v0.slot !== ev.slot)
+        v.push({ regra: "§2.2", descricao: "alocada ou movida a menos de 48h do início", cerimonia: ev.tipo })
+    })
 
   // R2 é objetivo, não invariante: o que não coube é reportado como déficit, não como violação.
   if (mundo && opcoes.conferirTime) {

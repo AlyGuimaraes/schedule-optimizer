@@ -6,7 +6,7 @@
  */
 import { createClient } from "@supabase/supabase-js"
 
-import { mapearMundo, type MundoBanco } from "../lib/dados/mapeador"
+import { aplicarPlano, mapearMundo, type MundoBanco, type PlanoBanco } from "../lib/dados/mapeador"
 import { simular, validarPlano } from "../lib/dominio"
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,14 +19,18 @@ if (!url || !chave) {
 const sb = createClient(url, chave, { auth: { persistSession: false } })
 
 const inicioCarga = Date.now()
-const { data, error } = await sb.rpc("carregar_mundo")
+const [{ data, error }, plano] = await Promise.all([sb.rpc("carregar_mundo"), sb.rpc("carregar_plano")])
 if (error) {
   console.error("carregar_mundo falhou:", error.message)
   process.exit(1)
 }
 const cargaMs = Date.now() - inicioCarga
 
-const { mundo, config } = mapearMundo(data as unknown as MundoBanco)
+// o mesmo caminho do app: mundo, plano vigente, âncoras, exceções e calendário real
+let dados = mapearMundo(data as unknown as MundoBanco)
+if (plano.error) console.error("carregar_plano falhou, seguindo sem o plano:", plano.error.message)
+else if (plano.data) dados = aplicarPlano(dados, plano.data as unknown as PlanoBanco)
+const { mundo, config } = dados
 const inicioSolver = performance.now()
 const sim = simular(mundo, config)
 const solverMs = Math.round(performance.now() - inicioSolver)

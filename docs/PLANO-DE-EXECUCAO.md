@@ -559,9 +559,9 @@ flowchart LR
 - [x] Cenário vigente e rascunhos: duplicar o vigente com snapshot das premissas, alterar, executar, comparar lado a lado (indicadores e diff de ocorrências), aplicar, descartar ou manter como alternativo
 - [ ] O alternador global passa a comparar a agenda atual com o cenário ativo, com seletor de cenário
 - [x] Estabilidade: termo w6 no custo do solver (`pesoEstabilidade`, 3 por padrão) e indicador Estabilidade do plano (1 − movidas / total), gravado no resumo do cenário
-- [ ] Limite de 20% de ocorrências movidas por ciclo como restrição relaxável com registro (hoje o peso w6 segura acima de 80% nos testes, mas não há corte explícito)
+- [x] Limite de 20% de ocorrências movidas por ciclo como restrição relaxável com registro: acima do limite, `simular` reforça o peso w6 (×3, até três vezes); se nem assim couber, fica a tentativa mais estável com `estabilidade.relaxada`, exibida no Otimizador
 - [x] Âncoras: ocorrência confirmada ou imposta pelo cliente vira restrição rígida; ação de ancorar na Agenda
-- [ ] Antecedência de 48h: nenhuma alocação nova ou movida a menos de 48h do início
+- [x] Antecedência de 48h: nenhuma alocação nova ou movida a menos de 48h do início. `limiteCongelamento` calcula a janela congelada da semana 1; o que o plano vigente já tinha ali fica no lugar (selo "mantida" na Agenda) e o validador acusa qualquer alocação nova ou movida dentro dela
 - [x] Diff de publicação por pessoa (novas, movidas, canceladas); o gestor revisa e publica
 - [x] Justificativa de cada ocorrência: camada, restrições ativas e por que aquele horário (mitigação da rejeição do time, §12)
 
@@ -576,8 +576,8 @@ flowchart LR
 - [ ] Exceções por projeto (escopo projeto): o esquema já aceita; falta definir quais campos fazem sentido por projeto
 - [x] Janela protegida da pessoa (§12): editável no modal; a edição pela própria pessoa, no perfil, depende do login (D-13)
 - [x] Modificadores determinísticos na geração da demanda, cada um visível com a origem (selo no detalhe da Agenda): volume de produtos (mais uma validação a cada 3 produtos acima da mediana), health amarelo (status report semanal), health vermelho (sala de guerra semanal escalada ao Líder Técnico), cliente de prioridade alta (checkpoint executivo mensal em todas as fases), atraso acima de 10 dias (dobra a cadência de status report). Chave em Premissas › Gerais, desligada por padrão para manter os números de referência; ligar remonta os squads
-- [ ] Ausências e feriados nacionais e municipais reduzindo a capacidade por dia; cadastro manual até a E23
-- [ ] Cadência ancorada em `series.inicio` com datas reais, substituindo `(projeto.id + semana) % cada` (defeito 8)
+- [x] Ausências e feriados nacionais e municipais reduzindo a capacidade por dia; cadastro manual até a E23. Tabela `ausencias` (migração 0008) com os feriados nacionais de 2026 e 2027, aba Time › Ausências, dia fora na Agenda e no motor, teto semanal proporcional aos dias disponíveis, regra no validador
+- [x] Cadência ancorada em `series.inicio` com datas reais, substituindo `(projeto.id + semana) % cada` (defeito 8). A migração 0008 grava uma série por projeto e item da fase atual com início que reproduz o faseamento do horizonte de 14/09/2026; `garantir_series` cria a série de projeto novo, mudança de fase ou item novo; o horizonte começa na próxima segunda (`lib/dominio/calendario.ts`) e o plano vigente é deslocado pelas semanas decorridas
 - [x] Horizonte do trimestre (13 semanas) no Otimizador, para o critério 2 do §13
 - [x] Campo "Atraso em dias" no modal do projeto (`projetos.atraso_dias`)
 
@@ -755,7 +755,7 @@ flowchart LR
 | 5 | Cores inexistentes usadas como texto: `var(--warn)` e `var(--accent)` (caem no valor herdado sem aviso) | L2018, L2113, L2138, L2400, L2563, L2734 | E01 |
 | 6 | Gráficos pedem a fonte "Geist", que não é carregada | L1628, L1646, L1648 | E01 |
 | 7 | Baseline embaralhada com `sort(() => rnd() - 0.5)`: viés e dependência do motor JavaScript | L1151 | E02 |
-| 8 | Cadência calculada por `(projeto.id + semana) % cada`, sem datas reais | L985, L1434 | E14 |
+| 8 | Cadência calculada por `(projeto.id + semana) % cada`, sem datas reais | L985, L1434 | E14 ✅ |
 | 9 | A visão semanal da Agenda mostra só a semana 1 do horizonte | L1840 | E11 |
 | 10 | Listas cortadas em 20 ou 24 itens sem aviso (projetos da pessoa, carga por pessoa) | L1988, L2024 | E11 |
 | 11 | Ids de pessoa são índices de array e são renumerados a cada exclusão | L1069 | E03, E04 |

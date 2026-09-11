@@ -268,7 +268,10 @@ function AbaGerais({ ctx }: { ctx: Contexto }) {
               <tr><td>Estabilidade de agenda</td><td className="n">até 20% movidas por ciclo</td></tr>
             </tbody>
           </table>
-          <span className="dica">Entram no otimizador com os cenários publicados (etapa E13).</span>
+          <span className="dica">
+            Valem em todo replanejamento com plano vigente: o que está a menos de 48h fica no lugar e no máximo 20%
+            das cerimônias mudam de horário por ciclo.
+          </span>
         </div>
       </Painel>
 

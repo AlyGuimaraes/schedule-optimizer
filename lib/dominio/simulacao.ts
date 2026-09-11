@@ -3,7 +3,39 @@ import { gerarDemanda } from "./demanda"
 import { kpis } from "./kpis"
 import { otimizar } from "./otimizador"
 import { geralDe } from "./premissas"
-import type { Config, Mundo, ResumoMes, SemanaSimulada, Simulacao } from "./tipos"
+import type { Cerimonia, Config, Mundo, ResultadoOtimizacao, ResumoMes, SemanaSimulada, Simulacao } from "./tipos"
+
+const acimaDoLimite = (r: ResultadoOtimizacao, limite: number) =>
+  !!r.estabilidade && r.estabilidade.movidas > r.estabilidade.comparaveis * limite + 1e-9
+
+/**
+ * Limite de movidas por ciclo (§2.2), restrição relaxável com registro. Com plano vigente, se mais
+ * de 20% das cerimônias comparáveis saírem do lugar, o peso da estabilidade é reforçado (×3, até
+ * três vezes). Se nem assim couber, fica a tentativa mais estável, marcada como relaxada.
+ */
+function comLimiteDeMovidas(dem: Cerimonia[], mundo: Mundo, cfg: Config): ResultadoOtimizacao {
+  const rodar = (c: Config) => otimizar(dem.map((e) => ({ ...e })), mundo.pessoas, c, mundo)
+  const primeiro = rodar(cfg)
+  if (!cfg.planoVigente) return primeiro
+  const limite = cfg.limiteMovidas ?? 0.2
+  if (!acimaDoLimite(primeiro, limite)) return primeiro
+
+  let melhor = primeiro
+  let pesoMelhor = cfg.pesoEstabilidade ?? 3
+  let peso = pesoMelhor
+  for (let i = 0; i < 3; i++) {
+    peso = Math.max(peso, 1) * 3
+    const t = rodar({ ...cfg, pesoEstabilidade: peso })
+    if ((t.estabilidade?.pct ?? 0) > (melhor.estabilidade?.pct ?? 0)) {
+      melhor = t
+      pesoMelhor = peso
+    }
+    if (!acimaDoLimite(t, limite)) break
+  }
+  if (melhor.estabilidade)
+    melhor.estabilidade = { ...melhor.estabilidade, peso: pesoMelhor, relaxada: acimaDoLimite(melhor, limite) }
+  return melhor
+}
 
 /**
  * Roda o horizonte inteiro. O orçamento mensal é acumulado semana a semana,
@@ -23,7 +55,7 @@ export function simular(mundo: Mundo, cfg: Config): Simulacao {
       geralDe(cfg)
     )
     const cfgW: Config = { ...cfg, acumulado: acumulado.slice(), semanaIdx: w }
-    const otm = otimizar(dem.map((e) => ({ ...e })), mundo.pessoas, cfgW, mundo)
+    const otm = comLimiteDeMovidas(dem, mundo, cfgW)
     otm.alocadas.forEach((ev) =>
       ev.participantes.forEach((p) => {
         acumulado[p] += ev.dur / 60

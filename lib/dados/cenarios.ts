@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
-import { justificativa, simular, validarPlano, type PerfilId } from "@/lib/dominio"
+import { instanteSlot, justificativa, proximaSegunda, simular, validarPlano, type PerfilId } from "@/lib/dominio"
 
 import { clienteAdmin } from "./admin"
 import { aplicarPlano, mapearMundo, type MundoBanco, type PlanoBanco } from "./mapeador"
@@ -23,20 +23,9 @@ const lotes = <T,>(linhas: T[], tamanho = 500) =>
   Array.from({ length: Math.ceil(linhas.length / tamanho) }, (_, i) => linhas.slice(i * tamanho, (i + 1) * tamanho))
 const r2 = (v: number) => Math.round(v * 100) / 100
 
-/** Próxima segunda-feira em São Paulo (UTC−3, sem horário de verão desde 2019). */
-function proximaSegunda(): string {
-  const agora = new Date(Date.now() - 3 * 3600_000)
-  const faltam = (8 - agora.getUTCDay()) % 7 || 7
-  return new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + faltam))
-    .toISOString()
-    .slice(0, 10)
-}
-
-/** Instante real de um slot do motor: semana do horizonte, dia 0 a 4, slot de 30 min a partir das 08:00. */
-function instante(inicio: string, semana: number, dia: number, slot: number) {
-  const base = new Date(`${inicio}T00:00:00-03:00`).getTime()
-  return new Date(base + ((semana - 1) * 7 + dia) * 86_400_000 + (8 * 60 + slot * 30) * 60_000).toISOString()
-}
+/** Instante real de um slot do motor, em ISO. */
+const instante = (inicio: string, semana: number, dia: number, slot: number) =>
+  new Date(instanteSlot(inicio, semana, dia, slot)).toISOString()
 
 export async function salvarCenario(e: {
   nome: string
@@ -63,7 +52,7 @@ export async function salvarCenario(e: {
     const solverMs = Math.round(performance.now() - t0)
 
     const id = randomUUID()
-    const inicio = proximaSegunda()
+    const inicio = config.calendario?.inicio ?? proximaSegunda()
     const ocorrencias: Record<string, unknown>[] = []
     const participantes: Record<string, unknown>[] = []
     const concessoes: Record<string, unknown>[] = []

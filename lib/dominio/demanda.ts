@@ -1,3 +1,4 @@
+import { ocorreNaSemana } from "./calendario"
 import { itensDoProjeto, medianaProdutos } from "./modificadores"
 import { etapaDe, pesoCliente } from "./premissas"
 import type { Cerimonia, Config, ItemPlaybook, Mundo, Papel, Projeto } from "./tipos"
@@ -19,7 +20,7 @@ export function gerarDemanda(mundo: Mundo, semana = 1, cfg?: Partial<Config>): C
     const et = etapaDe(cfg, pr.fase)
     const pc = pesoCliente(cfg, pr.prioridade || "media")
     itensVigentes(mundo, pr, cfg, mediana).forEach((c) => {
-      if ((pr.id + semana) % c.cada !== 0) return
+      if (!ocorreNaSemana(pr.id, c.tipo, c.cada, semana, cfg)) return
       // sem quórum: a cerimônia não entra na demanda
       if (c.papeis.some((pp) => pr.squad[pp] === undefined || pr.squad[pp] === null)) return
       const pares = c.papeis
@@ -79,7 +80,7 @@ export function demandaPorCargo(
   for (let w = 1; w <= nSemanas; w++) {
     mundo.projetos.forEach((pr) => {
       itensVigentes(mundo, pr, cfg, mediana).forEach((c) => {
-        if ((pr.id + w) % c.cada !== 0) return
+        if (!ocorreNaSemana(pr.id, c.tipo, c.cada, w, cfg)) return
         const falta = c.papeis.some((pp) => pr.squad[pp] === undefined || pr.squad[pp] === null)
         c.papeis.forEach((pp) => {
           horas[pp] = (horas[pp] || 0) + c.dur / 60

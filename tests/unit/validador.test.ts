@@ -16,7 +16,7 @@ describe("validador em 100 sementes", () => {
       for (const w of sim.semanas) {
         alocadas += w.otm.alocadas.length
         const v = validarPlano(w.otm, w.demanda, mundo.pessoas, { ...cfg, semanaIdx: w.semana }, mundo)
-        if (v.length) falhas.push(`semente ${seed}, semana ${w.semana + 1}: ${v[0].regra} ${v[0].detalhe}`)
+        if (v.length) falhas.push(`semente ${seed}, semana ${w.semana + 1}: ${v[0].regra} ${v[0].descricao}`)
       }
     }
     expect(falhas).toEqual([])

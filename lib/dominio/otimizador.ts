@@ -1,3 +1,4 @@
+import { posicaoNaSemana } from "./calendario"
 import { almoco, livre, marcar, novaOcupacao } from "./disponibilidade"
 import { DIAS, GERAL_PADRAO, PERFIS } from "./padroes"
 import { geralDe, premDe } from "./premissas"
@@ -85,9 +86,18 @@ export function otimizar(
   const alocadas: Cerimonia[] = []
   const concessoes: Concessao[] = []
 
+  // ausências e feriados da semana (E14): o dia sai da agenda da pessoa e o teto semanal encolhe
+  // na mesma proporção. Sem calendário, `disp` é 1 para todos e nada muda.
+  const indisp = cfg.calendario?.indisponivel?.[semanaIdx]
+  const fora = (p: number, d: number) => !!indisp?.[p]?.[d]
+  const disp = pessoas.map((_, p) => (DIAS - Object.keys(indisp?.[p] ?? {}).length) / DIAS)
+  const teto = (p: number) => PP[p].teto * disp[p]
+  // antecedência de 48h (§2.2): nas primeiras posições da semana 1 nada novo entra nem sai do lugar
+  const congelado = semanaIdx === 1 ? (cfg.calendario?.congeladoAte ?? 0) : 0
+
   // nível 0 = premissa alvo; nível 1 = o máximo que o perfil autoriza ceder
   const tetoEf = (p: number, r: boolean) =>
-    r ? PP[p].teto + (PP[p].tetoMax - PP[p].teto) * PF.usaTolerancia : PP[p].teto
+    (r ? PP[p].teto + (PP[p].tetoMax - PP[p].teto) * PF.usaTolerancia : PP[p].teto) * disp[p]
   const reunEf = (p: number, r: boolean) => PP[p].maxReunioesDia + (r ? PF.extraReunioes : 0)
   const horasEf = (p: number, r: boolean) => PP[p].maxHorasDia + (r ? PF.extraHoras : 0)
   const janelaEf = (p: number, r: boolean) =>
@@ -97,6 +107,7 @@ export function otimizar(
   // toda restrição de cargo é avaliada participante a participante, e a mais restritiva vence (§4.2)
   function viavel(parts: number[], d: number, s: number, slots: number, h: number, r: boolean) {
     for (const p of parts) {
+      if (fora(p, d)) return false
       if (s < Math.max(G.inicio, janelaEf(p, r))) return false
       if (slots > durEf(p, r)) return false
       if (!livre(oc, p, d, s, slots, G, true)) return false
@@ -116,7 +127,7 @@ export function otimizar(
       c += (depois - antes) * PF.pesoFrag
       for (let i = 0; i < slots; i++) if (!pref.has(s + i)) c += G.pesoPreferencia
       c += porDia[p][d] === 0 ? 1.2 : 0.3 * porDia[p][d]
-      const folga = PP[p].teto - carga[p]
+      const folga = teto(p) - carga[p]
       c += folga <= 0 ? 2.5 : Math.max(0, 1.4 - folga)
     })
     if (PF.ancorar && ev && d !== ev.projetoId % DIAS) c += 2.2
@@ -134,6 +145,7 @@ export function otimizar(
     let m: { d: number; s: number; custo: number } | null = null
     for (let d = 0; d < DIAS; d++)
       for (let s = G.inicio; s + slots <= G.fim; s++) {
+        if (posicaoNaSemana(d, s) < congelado) continue
         if (!viavel(parts, d, s, slots, h, r)) continue
         const c = custo(parts, d, s, slots, ev)
         if (m === null || c < m.custo) m = { d, s, custo: c }
@@ -147,8 +159,8 @@ export function otimizar(
       const c = PP[p]
       const nome = pessoas[p].nome
       const cedidas: { premissa: string; alvo: number; valor: number; un: string }[] = []
-      if (carga[p] + h > c.teto + 1e-9)
-        cedidas.push({ premissa: "teto de reunião", alvo: c.teto, valor: carga[p] + h, un: "h" })
+      if (carga[p] + h > teto(p) + 1e-9)
+        cedidas.push({ premissa: "teto de reunião", alvo: teto(p), valor: carga[p] + h, un: "h" })
       if (porDia[p][d] + 1 > c.maxReunioesDia)
         cedidas.push({ premissa: "máx. reuniões/dia", alvo: c.maxReunioesDia, valor: porDia[p][d] + 1, un: "" })
       if (hDia[p][d] + h > c.maxHorasDia + 1e-9)
@@ -204,11 +216,31 @@ export function otimizar(
       const a = cfg.ancoras?.[chaveSerie(ev)]
       if (!a) return
       if (a.slot + ev.slots > G.fim) return
-      if (ev.participantes.every((p) => livre(oc, p, a.dia, a.slot, ev.slots, G, true))) {
+      if (ev.participantes.every((p) => !fora(p, a.dia) && livre(oc, p, a.dia, a.slot, ev.slots, G, true))) {
         confirmar(ev, { d: a.dia, s: a.slot }, false)
         ev.ancorada = true
         ancoradas.add(ev.id)
       }
+    })
+  }
+
+  // ---- antecedência de 48h: o que o plano vigente já marcou na janela congelada fica onde está ----
+  if (congelado > 0 && cfg.planoVigente) {
+    ordem.forEach((ev) => {
+      if (ancoradas.has(ev.id)) return
+      const v = cfg.planoVigente?.[chaveOcorrencia(ev, semanaIdx)]
+      if (!v || posicaoNaSemana(v.dia, v.slot) >= congelado || v.slot + ev.slots > G.fim) return
+      // fica no lugar se ainda couber nas premissas de hoje; obrigatória pode usar a tolerância
+      const h = ev.dur / 60
+      const cabe = (r: boolean) =>
+        ev.participantes.every(
+          (p) => carga[p] + h <= tetoEf(p, r) + 1e-9 && acum[p] + carga[p] + h <= tetoMes(p) + 1e-9
+        ) && viavel(ev.participantes, v.dia, v.slot, ev.slots, h, r)
+      if (cabe(false)) confirmar(ev, { d: v.dia, s: v.slot }, false)
+      else if (ev.obrig && cabe(true)) confirmar(ev, { d: v.dia, s: v.slot }, true)
+      else return
+      ev.congelada = true
+      ancoradas.add(ev.id)
     })
   }
 
@@ -246,7 +278,7 @@ export function otimizar(
       const novos = ev.participantes.slice()
       const subs: TrocaCadeira[] = []
       ev.participantes.forEach((pid, i) => {
-        if (carga[pid] + h <= PP[pid].teto + 1e-9 && acum[pid] + carga[pid] + h <= tetoMes(pid) + 1e-9)
+        if (carga[pid] + h <= teto(pid) + 1e-9 && acum[pid] + carga[pid] + h <= tetoMes(pid) + 1e-9)
           return
         const eleg = elegiveisDe(ev)
         const alt = (porPapel[ev.papeis[i]] || [])
@@ -254,10 +286,10 @@ export function otimizar(
             (x) =>
               novos.indexOf(x) < 0 &&
               (!eleg || eleg.indexOf(x) >= 0) &&
-              carga[x] + h <= PP[x].teto - 0.3 &&
+              carga[x] + h <= teto(x) - 0.3 &&
               acum[x] + carga[x] + h <= tetoMes(x) + 1e-9
           )
-          .sort((a, b) => carga[a] / PP[a].teto - carga[b] / PP[b].teto)[0]
+          .sort((a, b) => carga[a] / teto(a) - carga[b] / teto(b))[0]
         if (alt !== undefined) {
           subs.push({ de: pid, para: alt, papel: ev.papeis[i] })
           novos[i] = alt
@@ -266,7 +298,7 @@ export function otimizar(
       if (
         !subs.length ||
         novos.some(
-          (p) => carga[p] + h > PP[p].teto + 1e-9 || acum[p] + carga[p] + h > tetoMes(p) + 1e-9
+          (p) => carga[p] + h > teto(p) + 1e-9 || acum[p] + carga[p] + h > tetoMes(p) + 1e-9
         )
       ) {
         sobra2.push(ev)

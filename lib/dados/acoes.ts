@@ -10,6 +10,7 @@ import {
   PLAYBOOK_PADRAO,
   PREM_PADRAO,
 } from "@/lib/dominio"
+import { proximaSegunda } from "@/lib/dominio/calendario"
 import { iniciaisDe } from "@/lib/formato"
 
 import { clienteAdmin } from "./admin"
@@ -43,6 +44,8 @@ async function executar<T>(
     const sb = clienteAdmin()
     const dados = await fn(sb)
     if (opcoes.remontar || opcoes.rebalancear) await remontarSquads(sb, { rebalancear: opcoes.rebalancear })
+    // projeto novo, mudança de fase ou item novo no playbook: a série nasce na próxima segunda (defeito 8)
+    if (opcoes.revalidar !== false) checar(await sb.rpc("garantir_series", { p_inicio: proximaSegunda() }))
     if (opcoes.revalidar !== false) revalidatePath("/", "layout")
     return { ok: true, dados }
   } catch (e) {

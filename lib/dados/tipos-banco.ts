@@ -231,6 +231,44 @@ export type Database = {
         }
         Relationships: []
       }
+      ausencias: {
+        Row: {
+          criado_em: string
+          descricao: string
+          fim: string
+          id: string
+          inicio: string
+          pessoa_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_ausencia"]
+        }
+        Insert: {
+          criado_em?: string
+          descricao?: string
+          fim: string
+          id?: string
+          inicio: string
+          pessoa_id?: string | null
+          tipo: Database["public"]["Enums"]["tipo_ausencia"]
+        }
+        Update: {
+          criado_em?: string
+          descricao?: string
+          fim?: string
+          id?: string
+          inicio?: string
+          pessoa_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_ausencia"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ausencias_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cargos: {
         Row: {
           ativo: boolean
@@ -1538,6 +1576,7 @@ export type Database = {
         Args: { p_destino: string; p_time: string }
         Returns: undefined
       }
+      garantir_series: { Args: { p_inicio: string }; Returns: number }
       remover_etapa: {
         Args: { p_destino: string; p_etapa: string }
         Returns: undefined
@@ -1563,6 +1602,11 @@ export type Database = {
         | "realizada"
         | "cancelada"
         | "adiada"
+      tipo_ausencia:
+        | "ferias"
+        | "ausencia"
+        | "feriado_nacional"
+        | "feriado_municipal"
       tipo_produto: "relatorio" | "dashboard" | "integracao"
     }
     CompositeTypes: {
@@ -1708,6 +1752,12 @@ export const Constants = {
         "realizada",
         "cancelada",
         "adiada",
+      ],
+      tipo_ausencia: [
+        "ferias",
+        "ausencia",
+        "feriado_nacional",
+        "feriado_municipal",
       ],
       tipo_produto: ["relatorio", "dashboard", "integracao"],
     },

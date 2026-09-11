@@ -38,9 +38,10 @@ import { useCadencia } from "@/lib/estado/cadencia"
 import { useParametro } from "@/lib/estado/url"
 import { n0, n1, pc, primeiro } from "@/lib/formato"
 
+import { AbaAusencias } from "./ausencias"
 import { fatorMes, papeisDe, pessoaHora, pessoasDo, resultadoDe, situacaoPessoa } from "./comum"
 
-const ABAS = ["pessoas", "times", "cargos"] as const
+const ABAS = ["pessoas", "times", "cargos", "ausencias"] as const
 type AbaTime = (typeof ABAS)[number]
 
 export function TelaTime() {
@@ -55,12 +56,21 @@ function Time(ctx: Contexto) {
     { id: "pessoas" as const, rotulo: "Pessoas", apoio: `${mundo.pessoas.length} no time` },
     { id: "times" as const, rotulo: "Times", apoio: `${mundo.times.length} squads` },
     { id: "cargos" as const, rotulo: "Cargos", apoio: `${papeisDe(config).length} cadastrados` },
+    { id: "ausencias" as const, rotulo: "Ausências", apoio: "férias e feriados" },
   ]
   return (
     <>
       <Abas abas={abas} ativa={aba} onChange={setAba} />
       <div role="tabpanel">
-        {aba === "pessoas" ? <AbaPessoas ctx={ctx} /> : aba === "times" ? <AbaTimes ctx={ctx} /> : <AbaCargos ctx={ctx} />}
+        {aba === "pessoas" ? (
+          <AbaPessoas ctx={ctx} />
+        ) : aba === "times" ? (
+          <AbaTimes ctx={ctx} />
+        ) : aba === "cargos" ? (
+          <AbaCargos ctx={ctx} />
+        ) : (
+          <AbaAusencias ctx={ctx} />
+        )}
       </div>
     </>
   )

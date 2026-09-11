@@ -1,5 +1,13 @@
+import {
+  dataDoDia,
+  limiteCongelamento,
+  posicaoNoHorizonte,
+  proximaSegunda,
+  semanaAbsoluta,
+} from "@/lib/dominio/calendario"
 import { GERAL_PADRAO } from "@/lib/dominio/padroes"
 import type {
+  Calendario,
   Config,
   DiaProtegido,
   Etapa,
@@ -98,22 +106,108 @@ export interface DadosMundo {
   indices: Indices
   /** cenário publicado, cujo plano segura a estabilidade do replanejamento (E13) */
   vigente?: { id: string; nome: string; publicadoEm: string } | null
+  /** ausências e feriados cadastrados, para a aba Ausências do Time */
+  ausencias?: AusenciaBanco[]
 }
 
 /** Formato devolvido pela RPC `carregar_plano()`. */
 export interface PlanoBanco {
-  publicado: { id: string; nome: string; publicado_em: string } | null
+  publicado: { id: string; nome: string; publicado_em: string; horizonte_inicio?: string } | null
   ancoras: { projeto_id: string; playbook_item_id: string; dia: number; slot: number }[]
   ocorrencias: { projeto_id: string; playbook_item_id: string; semana: number; dia: number; slot: number }[]
   /** exceções por pessoa (§2.1), campo e valor já na unidade do motor */
   excecoes?: { pessoa_id: string; campo: string; valor: number }[]
+  /** ausências e feriados (E14); pessoa nula vale para todos */
+  ausencias?: AusenciaBanco[]
+  /** início real de cada série (defeito 8) */
+  series?: { projeto_id: string; playbook_item_id: string; inicio: string }[]
+}
+
+export type TipoAusencia = "ferias" | "ausencia" | "feriado_nacional" | "feriado_municipal"
+
+export interface AusenciaBanco {
+  id: string
+  pessoa_id: string | null
+  inicio: string
+  fim: string
+  tipo: TipoAusencia
+  descricao: string
+}
+
+export const ROTULO_AUSENCIA: Record<TipoAusencia, string> = {
+  ferias: "férias",
+  ausencia: "ausência",
+  feriado_nacional: "feriado nacional",
+  feriado_municipal: "feriado municipal",
+}
+
+/** Horizonte máximo do Otimizador, o trimestre: até onde ausências e feriados são projetados. */
+const SEMANAS_CALENDARIO = 13
+
+/**
+ * Calendário real do horizonte (E14): cadência a partir do início de cada série, ausências e
+ * feriados por dia e a janela congelada pela antecedência de 48h (§2.2).
+ */
+function montarCalendario(dados: DadosMundo, plano: PlanoBanco, agoraMs: number): Calendario {
+  const inicio = proximaSegunda(agoraMs)
+  const semana0 = semanaAbsoluta(inicio)
+  const projeto = new Map(dados.indices.projetos.map((id, i) => [id, i]))
+  const item = new Map(
+    Object.entries(dados.indices.playbook).map(([chave, id]) => {
+      const corte = chave.indexOf("|")
+      return [id, { fase: chave.slice(0, corte), tipo: chave.slice(corte + 1) }]
+    })
+  )
+
+  // só vale a série do item da fase atual do projeto; as de fases anteriores ficam de histórico
+  const inicioSerie: Record<string, number> = {}
+  ;(plano.series ?? []).forEach((s) => {
+    const i = projeto.get(s.projeto_id)
+    const it = item.get(s.playbook_item_id)
+    if (i === undefined || !it || dados.mundo.projetos[i]?.fase !== it.fase) return
+    inicioSerie[`${i}|${it.tipo}`] = semanaAbsoluta(s.inicio)
+  })
+
+  const pessoa = new Map(dados.indices.pessoas.map((id, i) => [id, i]))
+  const indisponivel: NonNullable<Calendario["indisponivel"]> = {}
+  const feriados: NonNullable<Calendario["feriados"]> = {}
+  const marcar = (semana: number, p: number, dia: number, motivo: string) => {
+    const s = (indisponivel[semana] ??= {})
+    ;(s[p] ??= {})[dia] = motivo
+  }
+  const fimHorizonte = dataDoDia(inicio, SEMANAS_CALENDARIO, 4)
+  ;(plano.ausencias ?? []).forEach((a) => {
+    if (a.fim < inicio || a.inicio > fimHorizonte) return
+    const motivo = a.descricao ? `${ROTULO_AUSENCIA[a.tipo]}: ${a.descricao}` : ROTULO_AUSENCIA[a.tipo]
+    for (let t = Date.parse(`${a.inicio}T00:00:00Z`); t <= Date.parse(`${a.fim}T00:00:00Z`); t += 86_400_000) {
+      const pos = posicaoNoHorizonte(inicio, new Date(t).toISOString().slice(0, 10))
+      if (!pos || pos.semana > SEMANAS_CALENDARIO) continue
+      if (a.pessoa_id === null) {
+        ;(feriados[pos.semana] ??= {})[pos.dia] = a.descricao || ROTULO_AUSENCIA[a.tipo]
+        dados.mundo.pessoas.forEach((_, p) => marcar(pos.semana, p, pos.dia, motivo))
+      } else {
+        const p = pessoa.get(a.pessoa_id)
+        if (p !== undefined) marcar(pos.semana, p, pos.dia, motivo)
+      }
+    }
+  })
+
+  const congeladoAte = limiteCongelamento(inicio, agoraMs)
+  return {
+    inicio,
+    semana0,
+    inicioSerie,
+    ...(congeladoAte > 0 ? { congeladoAte } : {}),
+    ...(Object.keys(indisponivel).length ? { indisponivel } : {}),
+    ...(Object.keys(feriados).length ? { feriados } : {}),
+  }
 }
 
 /**
  * Leva ao motor o plano vigente (termo de estabilidade) e as âncoras, com as chaves do domínio:
  * `projeto|cerimônia|semana` e `projeto|cerimônia`.
  */
-export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco): DadosMundo {
+export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco, agoraMs = Date.now()): DadosMundo {
   const projeto = new Map(dados.indices.projetos.map((id, i) => [id, i]))
   const tipo = new Map(
     Object.entries(dados.indices.playbook).map(([chave, id]) => [id, chave.slice(chave.indexOf("|") + 1)])
@@ -129,10 +223,16 @@ export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco): DadosMundo {
     const k = chave(a.projeto_id, a.playbook_item_id)
     if (k) ancoras[k] = { dia: a.dia, slot: a.slot }
   })
+  const calendario = montarCalendario(dados, plano, agoraMs)
+  // o plano vigente foi gerado para o horizonte dele: a semana k de lá é a semana k − deslocamento daqui
+  const deslocamento = plano.publicado?.horizonte_inicio
+    ? calendario.semana0 - semanaAbsoluta(plano.publicado.horizonte_inicio)
+    : 0
   const vigente: Record<string, { dia: number; slot: number }> = {}
   plano.ocorrencias.forEach((o) => {
     const k = chave(o.projeto_id, o.playbook_item_id)
-    if (k) vigente[`${k}|${o.semana}`] = { dia: o.dia, slot: o.slot }
+    const semana = o.semana - deslocamento
+    if (k && semana >= 1) vigente[`${k}|${semana}`] = { dia: o.dia, slot: o.slot }
   })
 
   const pessoa = new Map(dados.indices.pessoas.map((id, i) => [id, i]))
@@ -151,7 +251,9 @@ export function aplicarPlano(dados: DadosMundo, plano: PlanoBanco): DadosMundo {
       planoVigente: Object.keys(vigente).length ? vigente : undefined,
       pesoEstabilidade: 3,
       excecoesPessoa: Object.keys(excecoes).length ? excecoes : undefined,
+      calendario,
     },
+    ausencias: plano.ausencias ?? [],
     vigente: plano.publicado
       ? { id: plano.publicado.id, nome: plano.publicado.nome, publicadoEm: plano.publicado.publicado_em }
       : null,

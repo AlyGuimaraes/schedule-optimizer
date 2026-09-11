@@ -15,13 +15,33 @@ import {
   Terminal,
   VazioTela,
 } from "@/components/cadencia/primitivas"
-import { PERFIS, premDe, type PerfilId } from "@/lib/dominio"
+import { dataDoDia, diaMes, PERFIS, premDe, SLOTS_DIA, type Config, type PerfilId } from "@/lib/dominio"
 import { useCadencia } from "@/lib/estado/cadencia"
 import { useParametro } from "@/lib/estado/url"
-import { n0, n1, pc } from "@/lib/formato"
+import { DIAS_LB, hhmm, n0, n1, pc } from "@/lib/formato"
 
 import { AbaCenarios, SalvarCenario } from "./cenarios"
 import { papeisDe } from "./comum"
+
+/** Horizonte em datas reais: período, feriados e a janela congelada pela antecedência de 48h. */
+function textoCalendario(config: Config): string | null {
+  const cal = config.calendario
+  if (!cal) return null
+  const partes = [`De ${diaMes(cal.inicio)} a ${diaMes(dataDoDia(cal.inicio, config.horizonte, 4))}.`]
+  const feriados = Object.entries(cal.feriados ?? {})
+    .filter(([s]) => Number(s) <= config.horizonte)
+    .flatMap(([s, dias]) =>
+      Object.entries(dias).map(([d, nome]) => `${diaMes(dataDoDia(cal.inicio, Number(s), Number(d)))} ${nome}`)
+    )
+  partes.push(feriados.length ? `Feriados: ${feriados.join(", ")}.` : "Sem feriado no horizonte.")
+  const c = cal.congeladoAte ?? 0
+  partes.push(
+    c
+      ? `Antecedência de 48h: até ${DIAS_LB[Math.floor(c / SLOTS_DIA)] ?? "o fim da semana"} ${hhmm(c % SLOTS_DIA)} só fica o que já estava no plano vigente.`
+      : "Antecedência de 48h: o horizonte começa depois de 48h, nada está congelado."
+  )
+  return partes.join(" ")
+}
 
 const ABAS = ["resultado", "concessoes", "trocas", "pendencias", "cenarios"] as const
 type AbaOtimizador = (typeof ABAS)[number]
@@ -192,13 +212,26 @@ function Otimizador({ mundo, config, simulacao: sim, cenario, ms }: Contexto) {
             <label>Plano vigente</label>
             <span className="dica">
               {vigente
-                ? `${vigente.nome}, publicado em ${new Date(vigente.publicadoEm).toLocaleDateString("pt-BR")}. Mover uma cerimônia do lugar dele tem custo no replanejamento.`
+                ? `${vigente.nome}, publicado em ${new Date(vigente.publicadoEm).toLocaleDateString("pt-BR")}. Mover uma cerimônia do lugar dele tem custo no replanejamento, e no máximo 20% saem do lugar por ciclo.`
                 : "Nenhum plano publicado ainda. Salve esta execução como cenário e publique para ter uma referência de estabilidade."}
+              {R.estabilidade
+                ? ` Nesta execução, ${pc(R.estabilidade.pct)} das cerimônias ficaram no lugar${
+                    R.estabilidade.relaxada
+                      ? "; o limite de 20% não coube nem reforçando o peso da estabilidade e ficou registrado como relaxado."
+                      : "."
+                  }`
+                : null}
             </span>
             <button type="button" className="btn leve" style={{ justifySelf: "start", width: "fit-content" }} onClick={() => setSalvando(true)}>
               Salvar como cenário
             </button>
           </div>
+          {config.calendario ? (
+            <div className="campo">
+              <label>Calendário do horizonte</label>
+              <span className="dica">{textoCalendario(config)}</span>
+            </div>
+          ) : null}
           <div className="campo">
             <label>O que este perfil autoriza ceder</label>
             <table>

@@ -19,6 +19,8 @@ import { ancorar, removerAncora } from "@/lib/dados/cenarios"
 import {
   almoco,
   chaveSerie,
+  dataDoDia,
+  diaMes,
   etapaDe,
   geralDe,
   justificativa,
@@ -64,6 +66,7 @@ function Chevron() {
 // Porte de telaAgenda() do protótipo (§7.2).
 function Agenda(ctx: Contexto) {
   const { mundo, config, simulacao: sim, cenario } = ctx
+  const cal = config.calendario
   const [escala, setEscala] = useParametro("escala", "semana", ESCALAS)
   const [semanaTxt, setSemanaTxt] = useParametro<string>("semana", "1")
   const [pessoasUrl, setPessoas] = useListaParametro("pessoas")
@@ -257,12 +260,19 @@ function Agenda(ctx: Contexto) {
           <div className="gh">
             <b>h</b>
           </div>
-          {DIAS_LB.map((d, i) => (
-            <div key={d} className="gh" data-carregado={horasDia[i] ? 1 : 0}>
-              <b>{d}</b>
-              <em>{horasDia[i] ? `${n1(horasDia[i])}h` : "livre"}</em>
-            </div>
-          ))}
+          {DIAS_LB.map((d, i) => {
+            const feriado = cal?.feriados?.[semanaIdx + 1]?.[i]
+            const fora = umaPessoa ? cal?.indisponivel?.[semanaIdx + 1]?.[umaPessoa.id]?.[i] : undefined
+            return (
+              <div key={d} className="gh" data-carregado={horasDia[i] ? 1 : 0} data-dica={feriado ?? fora}>
+                <b>
+                  {d}
+                  {cal ? <span className="meta"> {diaMes(dataDoDia(cal.inicio, semanaIdx + 1, i))}</span> : null}
+                </b>
+                <em>{feriado ? "feriado" : fora ? "fora" : horasDia[i] ? `${n1(horasDia[i])}h` : "livre"}</em>
+              </div>
+            )
+          })}
           <div className="horas">
             {Array.from({ length: 20 }, (_, i) => (
               <div key={i}>{i % 2 === 0 ? hhmm(i) : ""}</div>
@@ -284,6 +294,10 @@ function Agenda(ctx: Contexto) {
                 ) : null}
                 <div className="zona z-almoco" style={{ top: G.almocoInicio * ALT, height: G.almocoDur * ALT }} />
                 {G.diaProtegido === "sexta" && d === 4 ? <div className="zona z-fora" style={{ top: 0, height: 20 * ALT }} /> : null}
+                {cal?.feriados?.[semanaIdx + 1]?.[d] ||
+                (umaPessoa && cal?.indisponivel?.[semanaIdx + 1]?.[umaPessoa.id]?.[d]) ? (
+                  <div className="zona z-fora" style={{ top: 0, height: 20 * ALT }} />
+                ) : null}
                 {G.diaProtegido === "sexta-tarde" && d === 4 ? (
                   <div
                     className="zona z-fora"
@@ -379,6 +393,7 @@ function Agenda(ctx: Contexto) {
               <Fragment key={wi}>
                 <div className="ml">
                   Semana {wi + 1}
+                  {cal ? <span className="meta">{diaMes(dataDoDia(cal.inicio, wi + 1, 0))}</span> : null}
                   <span className="meta">
                     {evs.length} cerim., {n1(total)}h
                   </span>
@@ -584,7 +599,9 @@ function DetalheCerimonia({
     <Modal aberto largura={600} onFechar={onFechar} rotulo={ev.tipo}>
       <EditorCab
         titulo={ev.tipo}
-        meta={`${ev.projeto} · semana ${semana}, ${DIAS_LB[dia]} ${hhmm(slot)} às ${hhmm(slot + ev.slots)}`}
+        meta={`${ev.projeto} · semana ${semana}, ${DIAS_LB[dia]}${
+          config.calendario ? ` ${diaMes(dataDoDia(config.calendario.inicio, semana, dia))}` : ""
+        } ${hhmm(slot)} às ${hhmm(slot + ev.slots)}`}
       />
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
         <TagCerimonia tipo={ev.tipo} />
@@ -596,6 +613,7 @@ function DetalheCerimonia({
         {ancorada ? <Selo tom="acento">ancorada</Selo> : null}
         {!ev.obrig ? <Selo tom="neutro">opcional</Selo> : null}
         {ev.origem ? <Selo tom="acento">modificador: {ev.origem}</Selo> : null}
+        {ev.congelada ? <Selo tom="neutro">mantida, a menos de 48h</Selo> : null}
       </div>
       <SecCab titulo="Por que este horário" />
       <ul className="nota" style={{ display: "grid", gap: 6, paddingLeft: 18, listStyle: "disc" }}>
