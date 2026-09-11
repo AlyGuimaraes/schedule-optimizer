@@ -1,10 +1,10 @@
-import type { Config, Mundo, Simulacao } from "@/lib/dominio"
+import { custoCerimonia, custoHoraDe, type Config, type Mundo, type Simulacao } from "@/lib/dominio"
 
 import type { Cenario } from "@/lib/estado/cadencia"
 
-type Linha = [string, string, string, number, number, number]
+type Linha = [string, string, string, number, number, number, number]
 
-const CABECALHO = ["recorte", "nome", "detalhe", "reunioes_mes", "horas_agenda_mes", "pessoa_hora_mes"]
+const CABECALHO = ["recorte", "nome", "detalhe", "reunioes_mes", "horas_agenda_mes", "pessoa_hora_mes", "custo_mes_rs"]
 
 /**
  * Relatório mensal de reuniões por pessoa, cargo, projeto e etapa (critério 7 do §13).
@@ -22,12 +22,13 @@ export function relatorioMensal({
   cenario: Cenario
 }): string[][] {
   const F = 4.33 / config.horizonte
-  const soma = new Map<string, { detalhe: string; reunioes: number; horas: number; ph: number }>()
-  const somar = (chave: string, detalhe: string, horas: number, ph: number) => {
-    const atual = soma.get(chave) ?? { detalhe, reunioes: 0, horas: 0, ph: 0 }
+  const soma = new Map<string, { detalhe: string; reunioes: number; horas: number; ph: number; custo: number }>()
+  const somar = (chave: string, detalhe: string, horas: number, ph: number, custo: number) => {
+    const atual = soma.get(chave) ?? { detalhe, reunioes: 0, horas: 0, ph: 0, custo: 0 }
     atual.reunioes += F
     atual.horas += horas * F
     atual.ph += ph * F
+    atual.custo += custo * F
     soma.set(chave, atual)
   }
 
@@ -36,12 +37,14 @@ export function relatorioMensal({
     r.alocadas.forEach((ev) => {
       const h = ev.dur / 60
       const ph = h * ev.participantes.length
-      somar(`projeto|${ev.projeto}`, mundo.etapas[ev.fase]?.rotulo ?? ev.fase, h, ph)
-      somar(`etapa|${mundo.etapas[ev.fase]?.rotulo ?? ev.fase}`, "", h, ph)
-      ev.participantes.forEach((p) => {
+      const custo = custoCerimonia(ev, config)
+      somar(`projeto|${ev.projeto}`, mundo.etapas[ev.fase]?.rotulo ?? ev.fase, h, ph, custo)
+      somar(`etapa|${mundo.etapas[ev.fase]?.rotulo ?? ev.fase}`, "", h, ph, custo)
+      ev.participantes.forEach((p, i) => {
         const pessoa = mundo.pessoas[p]
-        somar(`pessoa|${pessoa.nome}`, pessoa.papel, h, h)
-        somar(`cargo|${pessoa.papel}`, "", h, h)
+        const custoPessoa = h * custoHoraDe(config, ev.papeis[i] ?? pessoa.papel)
+        somar(`pessoa|${pessoa.nome}`, pessoa.papel, h, h, custoPessoa)
+        somar(`cargo|${pessoa.papel}`, "", h, h, custoPessoa)
       })
     })
   })
@@ -50,7 +53,7 @@ export function relatorioMensal({
   const linhas: Linha[] = [...soma.entries()]
     .map(([chave, v]) => {
       const [recorte, nome] = chave.split("|")
-      return [recorte, nome, v.detalhe, Math.round(v.reunioes), +v.horas.toFixed(1), +v.ph.toFixed(1)] as Linha
+      return [recorte, nome, v.detalhe, Math.round(v.reunioes), +v.horas.toFixed(1), +v.ph.toFixed(1), +v.custo.toFixed(2)] as Linha
     })
     .sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]) || a[1].localeCompare(b[1]))
 

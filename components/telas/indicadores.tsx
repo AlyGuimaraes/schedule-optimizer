@@ -3,11 +3,22 @@
 import { ComDados, type Contexto } from "@/components/cadencia/com-dados"
 import { GraficoBarras } from "@/components/cadencia/grafico-barras"
 import { delta, Faixa, Indicador, SecCab, Selo, Trilha, tomOcupacao, type Tom } from "@/components/cadencia/primitivas"
-import { analiseCapacidade, cargosDoTime, membrosDoTime, papeisNecessarios, premDe, projetosDoTime } from "@/lib/dominio"
+import {
+  analiseCapacidade,
+  analisarCustos,
+  cargosDoTime,
+  custoHoraDe,
+  membrosDoTime,
+  papeisNecessarios,
+  premDe,
+  projetosDoTime,
+} from "@/lib/dominio"
 import { n0, n1, pc } from "@/lib/formato"
 import { baixarCsv, relatorioMensal } from "@/lib/relatorios/mensal"
 
-import { CUSTO_HORA, papeisDe, resultadoDe } from "./comum"
+import { papeisDe, resultadoDe } from "./comum"
+
+const brl = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })
 
 export function TelaIndicadores() {
   return <ComDados>{(ctx) => <Indicadores {...ctx} />}</ComDados>
@@ -40,6 +51,12 @@ function Indicadores(ctx: Contexto) {
 
   const capacidade = analiseCapacidade(mundo, config, config.horizonte)
 
+  // custo de cerimônia (E08, E24): pessoa-hora do mês vezes o custo-hora do cargo
+  const custoDe = (m: typeof mes) =>
+    mundo.pessoas.reduce((s, p) => s + m.porPessoa[p.id].horas * custoHoraDe(config, p.papel), 0)
+  const custos = analisarCustos(sim, mundo, config, cenario)
+  const maiorCliente = custos.porCliente[0]?.custo || 1
+
   return (
     <>
       <Faixa>
@@ -53,7 +70,11 @@ function Indicadores(ctx: Contexto) {
           tom={mes.produtivo >= k.alvoMedio ? "bom" : "ruim"}
           delta={cmp ? delta(mb.produtivo, mo.produtivo, false, " p.p.") : undefined}
         />
-        <Indicador rotulo="Custo de cerimônia" valor={`R$ ${n0((mes.horas * CUSTO_HORA) / 1000)}k`} />
+        <Indicador
+          rotulo="Custo de cerimônia"
+          valor={`R$ ${n0(custoDe(mes) / 1000)}k`}
+          delta={cmp ? delta(custoDe(mb) / 1000, custoDe(mo) / 1000, true, "k") : undefined}
+        />
       </Faixa>
 
       <div className="colunas c-2 sec">
@@ -204,6 +225,90 @@ function Indicadores(ctx: Contexto) {
 
       <div className="colunas c-2 sec">
         <section>
+          <SecCab
+            titulo="Custo por cliente"
+            apoio={`R$ ${brl(custos.total)} no mês, ${custos.porCliente.length} clientes`}
+          />
+          <div className="rolagem" style={{ maxHeight: 380 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th className="n">Projetos</th>
+                  <th className="n">Cerim./mês</th>
+                  <th className="n">Pessoa-hora</th>
+                  <th className="n">Custo/mês</th>
+                  <th style={{ width: 110 }}>Participação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {custos.porCliente.map((c) => (
+                  <tr key={c.chave}>
+                    <td><b>{c.chave}</b></td>
+                    <td className="n">{c.projetos}</td>
+                    <td className="n">{n0(c.cerimonias)}</td>
+                    <td className="n">{n1(c.pessoaHora)}h</td>
+                    <td className="n">R$ {brl(c.custo)}</td>
+                    <td>
+                      <Trilha valor={c.custo} max={maiorCliente} />
+                      <div className="meta">{pc(custos.total ? (c.custo / custos.total) * 100 : 0)} do total</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section>
+          <SecCab titulo="Custo por tipo de cerimônia" apoio="onde vai o custo de reunião" />
+          <GraficoBarras
+            dados={custos.porTipo.slice(0, 8).map((t) => ({
+              l: t.chave.split(" ")[0].slice(0, 9),
+              v: t.custo / 1000,
+              t: `R$ ${n1(t.custo / 1000)}k`,
+              cor: "var(--chart-3)",
+            }))}
+            valores
+            dicas
+            eixoY={false}
+            alt="custo por tipo de cerimônia"
+          />
+          <SecCab
+            titulo="Benchmark por volume de produtos"
+            apoio="horas de cerimônia por projeto e por produto"
+            style={{ marginTop: 18 }}
+          />
+          <table>
+            <thead>
+              <tr>
+                <th>Faixa</th>
+                <th className="n">Projetos</th>
+                <th className="n">h por projeto</th>
+                <th className="n">h por produto</th>
+                <th className="n">Custo por projeto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {custos.porVolume.map((v) => (
+                <tr key={v.chave}>
+                  <td>{v.chave}</td>
+                  <td className="n">{v.projetos}</td>
+                  <td className="n">{n1(v.pessoaHora / v.projetos)}h</td>
+                  <td className="n">{v.produtos ? `${n1(v.pessoaHora / v.produtos)}h` : "n/d"}</td>
+                  <td className="n">R$ {brl(v.custo / v.projetos)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="nota" style={{ marginTop: 9 }}>
+            Pessoa-hora de cerimônia no mês. A complexidade de cada produto entra quando o Módulo de Projetos for
+            integrado (E23); por ora o benchmark usa a quantidade de produtos.
+          </p>
+        </section>
+      </div>
+
+      <div className="colunas c-2 sec">
+        <section>
           <SecCab titulo="Taxa de reunião por cargo" apoio="tracejado marca o teto do cargo" />
           <GraficoBarras
             dados={porPapel.map((x) => ({
@@ -259,7 +364,7 @@ function Indicadores(ctx: Contexto) {
             </tbody>
           </table>
           <p className="nota" style={{ marginTop: 9 }}>
-            Custo estimado a R$ {CUSTO_HORA} por hora-pessoa. As reuniões mensais são projetadas a partir do horizonte
+            Custo pelo custo-hora de cada cargo, editável em Premissas › Por cargo. As reuniões mensais são projetadas a partir do horizonte
             simulado. O relatório exporta reuniões e horas por pessoa, cargo, projeto e etapa.
           </p>
         </section>

@@ -110,6 +110,8 @@ export interface Projeto {
   timeId: number
   /** desvio de cronograma em dias; acima de 10 dobra a cadência de status report (§3.3) */
   atrasoDias?: number
+  /** nome do cliente, quando vem do banco; na semente é derivado do nome do projeto */
+  cliente?: string
 }
 
 export interface Time {
@@ -151,6 +153,8 @@ export interface Config {
   modificadores?: boolean
   /** Exceções por pessoa (§2.1), pelo índice da pessoa: o nível mais específico vence o cargo. */
   excecoesPessoa?: Record<number, Partial<PremissasCargoEntrada>>
+  /** Custo por hora-pessoa de cada cargo (§6); sem valor, vale o do protótipo. */
+  custoHora?: Record<Papel, number>
   /** Exceções por projeto (§2.1), pelo índice do projeto: janela do cliente e duração máxima. */
   excecoesProjeto?: Record<number, ExcecaoProjeto>
   /** Fração máxima de cerimônias movidas por ciclo (§2.2), só com plano vigente; 0,2 por padrão. */

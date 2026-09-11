@@ -101,5 +101,5 @@ export interface DiffCenario {
   porPessoa: { nome: string; novas: number; movidas: number; canceladas: number }[]
 }
 
-export type PremissaCargoParcial = Partial<PremissasCargoEntrada>
+export type PremissaCargoParcial = Partial<PremissasCargoEntrada> & { custoHora?: number }
 export type PremissasGeraisParcial = Partial<PremissasGerais>

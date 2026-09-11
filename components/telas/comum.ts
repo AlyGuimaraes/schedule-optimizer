@@ -27,6 +27,3 @@ export const fatorMes = (config: Config) => 4.33 / config.horizonte
 /** Pessoa-hora de uma cerimônia: duração vezes participantes. */
 export const pessoaHora = (ev: { dur: number; participantes: number[] }) =>
   (ev.dur / 60) * ev.participantes.length
-
-/** Custo por hora-pessoa do protótipo, até o custo-hora por cargo entrar na tela de premissas. */
-export const CUSTO_HORA = 118

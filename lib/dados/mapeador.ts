@@ -410,13 +410,16 @@ export function mapearMundo(
       mes: pr.mes,
       timeId,
       atrasoDias: pr.atraso_dias ?? 0,
+      cliente: pr.cliente,
     }
   })
 
   const papeis: Record<Papel, PremissasCargoEntrada> = {}
+  const custoHora: Record<Papel, number> = {}
   cargos.forEach((c) => {
     const p = b.premissas_cargo[c.id]
     if (p) papeis[c.nome] = mapearPremissa(p)
+    if (p?.custo_hora !== undefined && p.custo_hora !== null) custoHora[c.nome] = Number(p.custo_hora)
   })
 
   const config: Config = {
@@ -427,6 +430,7 @@ export function mapearMundo(
     geral: mapearGerais(b.premissas_gerais),
     etapas: urgencias,
     clientes: { ...b.prioridades },
+    custoHora,
     ...(b.premissas_gerais.modificadores_automaticos === true ? { modificadores: true } : {}),
   }
 

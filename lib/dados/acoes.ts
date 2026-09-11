@@ -435,6 +435,7 @@ function colunasPremissa(p: PremissaCargoParcial) {
   if (p.duracaoMax !== undefined) c.duracao_max_min = Math.round(p.duracaoMax * 30)
   if (p.blocoFocoMin !== undefined) c.bloco_foco_min_min = Math.round(p.blocoFocoMin * 30)
   if (p.focoProt !== undefined) c.janela_protegida_min = Math.round(p.focoProt * 30)
+  if (p.custoHora !== undefined) c.custo_hora = p.custoHora
   return c
 }
 

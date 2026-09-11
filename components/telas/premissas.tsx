@@ -23,6 +23,8 @@ import {
   salvarEtapa,
 } from "@/lib/dados/acoes"
 import {
+  CUSTO_HORA_PADRAO,
+  custoHoraDe,
   etapaDe,
   geralDe,
   medianaProdutos,
@@ -145,7 +147,10 @@ function Premissas(ctx: Contexto) {
         {aba === "gerais" ? (
           <AbaGerais ctx={ctx} />
         ) : aba === "cargo" ? (
-          <AbaCargo ctx={ctx} />
+          <>
+            <AbaCargo ctx={ctx} />
+            <CustoPorCargo ctx={ctx} />
+          </>
         ) : aba === "urgencia" ? (
           <AbaUrgencia ctx={ctx} />
         ) : (
@@ -563,6 +568,54 @@ function AbaCargo({ ctx }: { ctx: Contexto }) {
 }
 
 // ─────────────────────── urgência ───────────────────────
+
+/** Custo por hora-pessoa de cada cargo (§6): base do custo de cerimônia em Indicadores (E08, E24). */
+function CustoPorCargo({ ctx }: { ctx: Contexto }) {
+  const { config, indices } = ctx
+  const editarConfig = useCadencia((s) => s.editarConfig)
+  const aoErro = useErroGravacao()
+  const papeis = papeisDe(config)
+
+  const definir = (pp: string, v: number) => {
+    editarConfig((c) => ({ ...c, custoHora: { ...(c.custoHora ?? {}), [pp]: v } }), { adiado: true })
+    persistirAdiado(`custo|${pp}`, () => definirPremissaCargo(indices.cargos[pp], { custoHora: v }), aoErro)
+  }
+
+  return (
+    <section className="sec">
+      <SecCab titulo="Custo por hora do cargo" apoio="base do custo de cerimônia em Indicadores" />
+      <table style={{ maxWidth: 520 }}>
+        <thead>
+          <tr>
+            <th>Cargo</th>
+            <th className="n" style={{ width: 150 }}>R$ por hora-pessoa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {papeis.map((pp) => (
+            <tr key={pp}>
+              <td>{pp}</td>
+              <td className="n">
+                <Celula
+                  valor={custoHoraDe(config, pp)}
+                  min={0}
+                  max={2000}
+                  passo={1}
+                  rotulo={`Custo por hora de ${pp}`}
+                  onValor={(v) => definir(pp, v)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="nota" style={{ marginTop: 9 }}>
+        Custo cheio da hora: salário, encargos e benefícios. Sem valor cadastrado, vale R$ {CUSTO_HORA_PADRAO}, o
+        número do protótipo.
+      </p>
+    </section>
+  )
+}
 
 function AbaUrgencia({ ctx }: { ctx: Contexto }) {
   const { mundo, config, indices } = ctx
