@@ -46,9 +46,13 @@ export default async function RootLayout({
         <ThemeProvider defaultTheme="light" enableSystem={false} nonce={nonce}>
           <TooltipProvider delay={120}>{children}</TooltipProvider>
         </ThemeProvider>
-        {/* só coletam na Vercel; localmente não carregam nada */}
-        <Analytics />
-        <SpeedInsights />
+        {/* só na Vercel: fora dela o script nem entra na página, e o CSP não reclama */}
+        {process.env.VERCEL === "1" ? (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        ) : null}
       </body>
     </html>
   )

@@ -13,7 +13,12 @@ jobs:
   verificar:
     name: Lint, tipos, testes e build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      # os testes de ponta a ponta só rodam quando os segredos do Supabase existem no repositório
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,3 +45,60 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # navegação, fluxos, axe e cadastro, contra o banco de demonstração, no Chrome do runner
+      - name: Ponta a ponta
+        if: env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: pnpm e2e
+
+      - name: Sem segredos do Supabase, ponta a ponta pulado
+        if: env.SUPABASE_SERVICE_ROLE_KEY == ''
+        run: echo "::notice::Cadastre NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY e SUPABASE_SERVICE_ROLE_KEY nos segredos do repositório para rodar o pnpm e2e."
+
+      - name: Evidências do ponta a ponta
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Deploy de produção pela CLI da Vercel, enquanto o app da Vercel não tem acesso ao repositório.
+  # Liga sozinho quando o segredo VERCEL_TOKEN existir; retire este job quando a integração Git da
+  # Vercel estiver conectada, para não publicar duas vezes.
+  implantar:
+    name: Deploy na Vercel
+    needs: verificar
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_RATRe5a73crttbIBAHYsUyhO
+      VERCEL_PROJECT_ID: prj_HsP7GMEFpGI8WNq6qC85E0lvmlcc
+    steps:
+      - name: Sem VERCEL_TOKEN, deploy pulado
+        if: env.VERCEL_TOKEN == ''
+        run: echo "::notice::Cadastre o segredo VERCEL_TOKEN para o CI publicar na Vercel a cada push em main."
+
+      - uses: actions/checkout@v4
+        if: env.VERCEL_TOKEN != ''
+
+      - uses: pnpm/action-setup@v4
+        if: env.VERCEL_TOKEN != ''
+        with:
+          version: 11.22.0
+
+      - uses: actions/setup-node@v4
+        if: env.VERCEL_TOKEN != ''
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Build e deploy
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+          pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"

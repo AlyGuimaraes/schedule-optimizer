@@ -27,10 +27,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], channel: "chrome", viewport: { width: 1440, height: 900 } },
     },
   ],
+  // no CI o build já aconteceu: sobe o servidor de produção, com a vitrine liberada
   webServer: {
-    command: "pnpm dev",
+    command: process.env.CI ? "pnpm start" : "pnpm dev",
     url: "http://localhost:3000",
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: { VITRINE: "1" },
   },
 })
